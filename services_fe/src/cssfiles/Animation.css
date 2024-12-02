@@ -1,0 +1,123 @@
+.loader-container {
+	width: 100%;
+	height: 100vh;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: fixed;
+	/* background-image: url("../Components/GI-Logo.png"); */
+	background-repeat: no-repeat;
+	background-size: 10%;
+	background-position: center center;
+	z-index: 1;
+	margin-top: -10%;
+}
+
+.spinner {
+	width: 205px;
+	height: 207px;
+	border: 16px solid;
+	border-color: #f15922 transparent #67cd4d transparent;
+	border-radius: 100%;
+	animation: spin-anim 2s linear infinite;
+}
+
+@keyframes spin-anim {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+.loader-container {
+	width: 100%;
+	height: 100vh;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: fixed;
+	/* background-image: url("../Components/GI-Logo.png"); */
+	background-repeat: no-repeat;
+	background-size: 10%;
+	background-position: center center;
+	z-index: 1;
+	margin-top: -10%;
+}
+
+.spinner {
+	width: 205px;
+	height: 207px;
+	border: 16px solid;
+	border-color: #f15922 transparent #cd4da2 transparent;
+	border-radius: 100%;
+	animation: spin-anim 2s linear infinite;
+}
+
+@keyframes spin-anim {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+.head {
+	color: #000000;
+	background-color: rgb(221, 255, 205);
+}
+
+.head1 {
+	color: green !important;
+	background-color: rgb(221, 255, 205);
+}
+
+.head2 {
+	color: red !important;
+	background-color: rgb(221, 255, 205);
+}
+
+.head3 {
+	color: blue !important;
+	background-color: rgb(221, 255, 205);
+}
+
+.head4 {
+	background-color: rgb(205, 77, 162) !important;
+	color: rgb(255, 255, 255);
+}
+
+.p-card .p-card-title {
+	font-size: 1rem !important;
+	font-weight: 700 !important;
+	margin-bottom: 0.2rem !important;
+}
+
+.p-card .p-card-body {
+	padding: 0.2rem !important;
+}
+
+.p-card .p-card-content {
+	padding: 0.2rem !important;
+}
+
+element.style {
+	color: green !important;
+}
+.resolved {
+	color: green !important;
+}
+.pending {
+	color: red !important;
+}
+
+.total {
+	color: blue !important;
+}
+
+/* .p-tag{
+	font-size: large;
+	background-color:rgb(205, 77, 162);
+} */
