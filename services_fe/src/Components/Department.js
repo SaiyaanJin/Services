@@ -14,7 +14,7 @@ import { Column } from "primereact/column";
 import { Toast } from "primereact/toast";
 import { Dropdown } from "primereact/dropdown";
 import { ConfirmDialog } from "primereact/confirmdialog";
-import jwt_decode from "jwt-decode";
+import {jwtDecode} from "jwt-decode";
 import { Tag } from "primereact/tag";
 import { Dialog } from "primereact/dialog";
 import { InputTextarea } from "primereact/inputtextarea";
@@ -83,7 +83,7 @@ function Department(params) {
 						window.location = "https://sso.erldc.in:3000";
 						setPage_hide(true);
 					} else {
-						var decoded = jwt_decode(response.data["Final_Token"], "it@posoco");
+						var decoded = jwtDecode(response.data["Final_Token"], "it@posoco");
 
 						if (decoded["Login"] && decoded["Reason"] === "Session Expired") {
 							alert("session Expired, Please Login Again via SSO");
