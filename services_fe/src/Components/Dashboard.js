@@ -67,13 +67,13 @@ function Dashboard(params) {
 	};
 
 	useEffect(() => {
-		// axios
-		// 	.get("http://10.3.230.63:5000/emp_data", {
-		// 		headers: { Data: "Sanju8@92" },
-		// 	})
-		// 	.then((response) => {
-		// 		setemp_data(response.data);
-		// 	});
+		axios
+			.get("http://10.3.230.63:5000/emp_data", {
+				headers: { Data: "Sanju8@92" },
+			})
+			.then((response) => {
+				setemp_data(response.data);
+			});
 
 		if (id) {
 			params.var2(id);
