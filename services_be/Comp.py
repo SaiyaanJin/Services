@@ -453,7 +453,10 @@ def ExportDataAdmin():
 
 @app.route("/ExportDataDepartment", methods=['GET', 'POST'])
 def ExportDataDepartment():
-    Input_array = request.headers['Data']
+    try:
+        Input_array = request.headers['Data']
+    except:
+        Input_array = ''
     
 
     if Input_array == "Information Technology":

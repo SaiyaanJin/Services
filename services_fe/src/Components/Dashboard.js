@@ -67,19 +67,28 @@ function Dashboard(params) {
 	};
 
 	useEffect(() => {
-		axios
-			.get("http://10.3.230.63:5000/emp_data", {
-				headers: { Data: "Sanju8@92" },
-			})
-			.then((response) => {
-				setemp_data(response.data);
-			});
+		try {
+			axios
+				.get("https://sso.erldc.in:5000/emp_data", {
+					headers: { Data: "Sanju8@92" },
+				})
+				.then((response) => {
+					setemp_data(response.data);
+				})
+				.catch((error) => {
+					console.error("Error fetching employee data:", error);
+					setemp_data([]);
+				});
+		} catch (error) {
+			console.error("Unexpected error:", error);
+			setemp_data([]);
+		}
 
 		if (id) {
 			params.var2(id);
 
 			axios
-				.get("http://10.3.230.63:5000/verify", {
+				.get("https://sso.erldc.in:5000/verify", {
 					headers: { Token: id },
 				})
 				.then((response) => {
@@ -98,7 +107,7 @@ function Dashboard(params) {
 							alert("Session Expired, Please Login Again via SSO");
 
 							axios
-								.post("http://10.3.230.63:5000/logout", {
+								.post("https://sso.erldc.in:5000/logout", {
 									headers: { token: id },
 								})
 								.then((response) => {
