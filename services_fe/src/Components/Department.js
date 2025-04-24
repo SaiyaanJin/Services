@@ -172,7 +172,7 @@ function Department(params) {
 	const get_User_Input_data = () => {
 		if (!AdminChecked) {
 			axios
-				.get("http://10.3.200.63:5050/ExportDataDepartment", {
+				.get("http://10.3.230.62:5050/ExportDataDepartment", {
 					headers: { Data: Selected_department },
 				})
 				.then((response) => {
@@ -186,7 +186,7 @@ function Department(params) {
 				.catch((error) => {});
 		} else {
 			axios
-				.get("http://10.3.200.63:5050/ExportDataDepartmentAdmin", {
+				.get("http://10.3.230.62:5050/ExportDataDepartmentAdmin", {
 					headers: { Data: Selected_department },
 				})
 				.then((response) => {
@@ -213,7 +213,7 @@ function Department(params) {
 	const accept = () => {
 		if (Action_status_edited_data) {
 			axios
-				.get("http://10.3.200.63:5050/UserInputStatusupdate", {
+				.get("http://10.3.230.62:5050/UserInputStatusupdate", {
 					headers: {
 						datas: JSON.stringify([Action_status_edited_data]),
 					},
@@ -348,7 +348,7 @@ function Department(params) {
 								];
 
 								axios
-									.get("http://10.3.200.63:5050/UserInputupdate", {
+									.get("http://10.3.230.62:5050/UserInputupdate", {
 										headers: { datas: JSON.stringify(Selected_Action_data) },
 									})
 									.then((response) => {
@@ -406,7 +406,7 @@ function Department(params) {
 								];
 
 								axios
-									.get("http://10.3.200.63:5050/UserInputupdate", {
+									.get("http://10.3.230.62:5050/UserInputupdate", {
 										headers: { datas: JSON.stringify(Selected_Action_data) },
 									})
 									.then((response) => {
@@ -463,7 +463,7 @@ function Department(params) {
 								];
 
 								axios
-									.get("http://10.3.200.63:5050/UserInputupdate", {
+									.get("http://10.3.230.62:5050/UserInputupdate", {
 										headers: { datas: JSON.stringify(Selected_Action_data) },
 									})
 									.then((response) => {
@@ -535,7 +535,7 @@ function Department(params) {
 						];
 
 						axios
-							.get("http://10.3.200.63:5050/UserInputupdate", {
+							.get("http://10.3.230.62:5050/UserInputupdate", {
 								headers: { datas: JSON.stringify(Selected_Action_data) },
 							})
 							.then((response) => {
@@ -585,7 +585,7 @@ function Department(params) {
 			return (
 				<a
 					href={
-						"http://10.3.200.63:5050/download?File_Name=Docket_No " +
+						"http://10.3.230.62:5050/download?File_Name=Docket_No " +
 						data.Docket_Number +
 						" file for " +
 						data.Department +
@@ -1057,7 +1057,7 @@ function Department(params) {
 						];
 
 						axios
-							.get("http://10.3.200.63:5050/UserInputupdate", {
+							.get("http://10.3.230.62:5050/UserInputupdate", {
 								headers: { datas: JSON.stringify(Selected_Action_data) },
 							})
 							.then((response) => {

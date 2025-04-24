@@ -280,7 +280,7 @@ function Input(params) {
 		var final_data = JSON.stringify(data_to_send);
 
 		axios
-			.get("http://10.3.200.63:5050/DataInsert", {
+			.get("http://10.3.230.62:5050/DataInsert", {
 				headers: { Data: final_data },
 			})
 			.then((response) => {
@@ -546,7 +546,7 @@ function Input(params) {
 											disabled={!upload_allow}
 											name="demo[]"
 											onUpload={file_name}
-											url="http://10.3.200.63:5050/upload"
+											url="http://10.3.230.62:5050/upload"
 											accept="pdf/*"
 											maxFileSize={10000000}
 											multiple

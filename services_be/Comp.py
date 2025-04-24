@@ -242,7 +242,7 @@ def upload():
             name = name.replace("(", "")
             filepath = filepath+name
 
-        filepath = 'D:/Applications/Services/services_be/instance/htmlfi/'+filepath
+        filepath = 'E:/Applications/Services/services_be/instance/htmlfi/'+filepath
         for item in file:
             os.makedirs(os.path.join(
                 app.instance_path, filepath), exist_ok=True)
@@ -268,7 +268,7 @@ def download():
         file1 = file1.replace("(", "")
         filepath = filepath+file1
 
-    folder_path = "D:/Applications/Services/services_be/instance/htmlfi/"+filepath
+    folder_path = "E:/Applications/Services/services_be/instance/htmlfi/"+filepath
 
     dir_list = os.listdir(folder_path)
 
@@ -286,14 +286,14 @@ def download():
         else:
             return jsonify(file+" has been removed")
 
-    # with ZipFile('D:/test/Service Portal/services_be/instance/file.zip', 'w') as zip_object:
+    # with ZipFile('E:/test/Service Portal/services_be/instance/file.zip', 'w') as zip_object:
     #     for items in all_files:
     #         zip_object.write(items)
 
     archived = shutil.make_archive(
-        "D:/Applications/Services/services_be/instance/ZipFiles/testzip", 'zip', folder_path)
+        "E:/Applications/Services/services_be/instance/ZipFiles/testzip", 'zip', folder_path)
 
-    return send_file('D:/Applications/Services/services_be/instance/ZipFiles/testzip.zip', as_attachment=True, download_name=File_Name+".zip")
+    return send_file('E:/Applications/Services/services_be/instance/ZipFiles/testzip.zip', as_attachment=True, download_name=File_Name+".zip")
 
 # ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 

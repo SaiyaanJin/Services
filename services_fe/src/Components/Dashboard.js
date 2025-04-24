@@ -179,7 +179,7 @@ function Dashboard(params) {
 			setcount(false);
 
 			axios
-				.get("http://10.3.200.63:5050/Dashboard", {
+				.get("http://10.3.230.62:5050/Dashboard", {
 					headers: { Data: Person_Name + " (" + User_id + ")" },
 				})
 				.then((response) => {
