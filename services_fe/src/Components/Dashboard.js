@@ -68,7 +68,7 @@ function Dashboard(params) {
 
 	useEffect(() => {
 		axios
-			.get("https://sso.erldc.in:5000/emp_data", {
+			.get("http://10.3.230.63:5000/emp_data", {
 				headers: { Data: "Sanju8@92" },
 			})
 			.then((response) => {
@@ -79,17 +79,17 @@ function Dashboard(params) {
 			params.var2(id);
 
 			axios
-				.get("https://sso.erldc.in:5000/verify", {
+				.get("http://10.3.230.63:5000/verify", {
 					headers: { Token: id },
 				})
 				.then((response) => {
 					if (response.data === "User has logout") {
 						alert("User Logged-out, Please login via SSO again");
-						window.location = "https://sso.erldc.in:3000";
+						window.location = "https://sso.erldc.in";
 						setpage_hide(true);
 					} else if (response.data === "Bad Token") {
 						alert("Unauthorised Access, Please login via SSO again");
-						window.location = "https://sso.erldc.in:3000";
+						window.location = "https://sso.erldc.in";
 						setpage_hide(true);
 					} else {
 						var decoded = jwtDecode(response.data["Final_Token"], "it@posoco");
@@ -98,14 +98,14 @@ function Dashboard(params) {
 							alert("Session Expired, Please Login Again via SSO");
 
 							axios
-								.post("https://sso.erldc.in:5000/1ogout", {
+								.post("http://10.3.230.63:5000/logout", {
 									headers: { token: id },
 								})
 								.then((response) => {
-									window.location = "https://sso.erldc.in:3000";
+									window.location = "https://sso.erldc.in";
 								})
 								.catch((error) => {});
-							window.location = "https://sso.erldc.in:3000";
+							window.location = "https://sso.erldc.in";
 						} else {
 							setUser_id(decoded["User"]);
 							setpage_hide(!decoded["Login"]);
