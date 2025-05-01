@@ -24,7 +24,7 @@ ALLOWED_EXTENSIONS = {'txt',
 def ComplaintCollection():
 
     # CONNECTION_STRING = "mongodb://forecast_user:forecast@10.3.101.90:27017/?authSource=admin"
-    CONNECTION_STRING = "mongodb://mongodb0.erldc.in:27017,mongodb1.erldc.in:27017/?replicaSet=CONSERV"
+    CONNECTION_STRING = "mongodb://mongodb0.erldc.in:27017,mongodb1.erldc.in:27017,mongodb10.erldc.in:27017/?replicaSet=CONSERV"
     client = MongoClient(CONNECTION_STRING)
     db = client['Complaints']
     User_Input_Table = db['User_Input']
