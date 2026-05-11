@@ -20,6 +20,7 @@ import moment from "moment";
 // import { Dropdown } from "primereact/dropdown";
 import { Badge } from "primereact/badge";
 import { InputSwitch } from "primereact/inputswitch";
+import { Avatar } from "primereact/avatar";
 import "../cssfiles/Animation.css";
 
 function Data(params) {
@@ -938,230 +939,181 @@ function Data(params) {
 
 	return (
 		<>
-			<Fieldset hidden={!page_hide}>
-				<div className="card flex justify-content-center">
-					<h1>Please Login again by SSO</h1>
+			{/* Unauthorized Access Page */}
+			{page_hide && (
+				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+					<div className="premium-card text-center" style={{ maxWidth: "480px", padding: "40px" }}>
+						<Avatar icon="pi pi-lock" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(244, 63, 94, 0.1)", color: "var(--danger-color)", width: "80px", height: "80px", fontSize: "36px", margin: "0 auto 24px auto" }} />
+						<h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "12px" }}>Authentication Required</h2>
+						<p style={{ color: "var(--text-muted)", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "32px" }}>
+							Please log in securely via the Single Sign-On (SSO) gateway.
+						</p>
+						<Button 
+							label="Go to SSO Login" 
+							icon="pi pi-sign-in" 
+							className="p-button-danger w-full"
+							onClick={() => window.location = "https://sso.erldc.in"}
+						/>
+					</div>
 				</div>
-			</Fieldset>
+			)}
 
 			<Toast ref={toast} />
 			<ConfirmDialog
 				visible={Confirm_box_visible}
 				onHide={() => setConfirm_box_visible(false)}
-				message="Are you sure you want to Update Status?"
-				header="Alert"
+				message="Are you sure you want to update the request status?"
+				header="Confirm Action"
 				icon="pi pi-exclamation-triangle"
 				accept={accept}
 				reject={reject}
 			/>
 
-			<Fieldset
-				hidden={page_hide}
-				legend={
-					<div className="flex align-items-center ">
-						<span
-							className="pi pi-file-export"
-							style={{ fontWeight: "bold", fontSize: "small" }}
-						></span>
-						<span className="font-bold text-small">User Data</span>
+			{!page_hide && (
+				<div style={{ padding: "16px 2.2% 40px 2.2%" }}>
+					{/* Header section */}
+					<div className="flex align-items-center gap-3 mb-4" style={{ paddingLeft: "8px" }}>
+						<Avatar icon="pi pi-file-export" style={{ backgroundColor: "rgba(79, 70, 229, 0.1)", color: "var(--primary-color)" }} shape="circle" />
+						<div>
+							<h1 style={{ textAlign: "left", padding: 0, margin: 0, fontSize: "1.6rem", fontWeight: 800 }}>Logged Requests Directory</h1>
+							<span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>View, edit and audit raised service requests</span>
+						</div>
 					</div>
-				}
-			>
-				<Container>
-					<Row>
-						<Col sm={3}>
-							<div hidden={!isAdmin}>
-								<span
-									hidden={!isAdmin}
-									className="p-float-label"
-									style={{ marginLeft: "70%", marginTop: "-10%" }}
-								>
-									<h4>Admin Mode</h4>
 
-									<div hidden={!isAdmin}>
-										<InputSwitch
-											disabled={!isAdmin}
-											style={{ marginLeft: "4%", marginTop: "-15%" }}
-											checked={AdminChecked}
-											onChange={(e) => setAdminChecked(e.value)}
-										/>
+					{/* Control Dashboard Card */}
+					<div className="premium-card" style={{ padding: "20px 32px", marginBottom: "24px" }}>
+						<div className="flex flex-column md:flex-row align-items-center justify-content-between gap-4">
+							
+							{/* Admin Mode Toggle */}
+							<div style={{ opacity: isAdmin ? 1 : 0.4, pointerEvents: isAdmin ? "auto" : "none" }}>
+								<div className="flex align-items-center gap-3">
+									<i className="pi pi-shield" style={{ fontSize: "1.2rem", color: "var(--danger-color)" }}></i>
+									<div>
+										<span style={{ fontSize: "0.85rem", fontWeight: "700", display: "block" }}>Admin Dashboard Mode</span>
+										<span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Authorized handlers only</span>
 									</div>
-								</span>
-							</div>
-						</Col>
-
-						<Col sm={6}>
-							<div className="card flex justify-content-center">
-								<span className="p-float-label">
-									<Button
-										icon="pi pi-download"
-										severity="success"
-										raised
-										rounded
-										label="Fetch Your Data"
-										aria-label="Your Data"
-										onClick={() => {
-											get_User_Input_data();
-										}}
-									/>
-								</span>
-							</div>
-						</Col>
-						<Col sm={3}>
-							<div className="card flex justify-content-right">
-								<span className="p-float-label" style={{ marginTop: "-10%" }}>
-									<h4>{DepartmentalChecked_button}</h4>
-
 									<InputSwitch
-										tooltip={"switch between Department & User"}
-										style={{ marginLeft: "24%", marginTop: "-15%" }}
+										disabled={!isAdmin}
+										checked={AdminChecked}
+										onChange={(e) => setAdminChecked(e.value)}
+									/>
+								</div>
+							</div>
+
+							{/* Fetch Button */}
+							<div>
+								<Button
+									icon="pi pi-refresh"
+									severity="success"
+									raised
+									label="Fetch Live Request Data"
+									onClick={() => {
+										get_User_Input_data();
+									}}
+									style={{ padding: "12px 28px" }}
+								/>
+							</div>
+
+							{/* Department / User toggle */}
+							<div>
+								<div className="flex align-items-center gap-3">
+									<i className="pi pi-users" style={{ fontSize: "1.2rem", color: "var(--primary-color)" }}></i>
+									<div>
+										<span style={{ fontSize: "0.85rem", fontWeight: "700", display: "block" }}>{DepartmentalChecked_button}</span>
+										<span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Toggle filter scope</span>
+									</div>
+									<InputSwitch
+										tooltip={"Switch between Department and Personal view"}
 										checked={DepartmentalChecked}
 										onChange={(e) => setDepartmentalChecked(e.value)}
 									/>
-								</span>
+								</div>
 							</div>
-						</Col>
-					</Row>
-				</Container>
 
-				<div
-					className="card"
-					hidden={show_table}
-					style={{
-						width: "auto",
-						whitespace: "nowrap",
-					}}
-				>
-					<DataTable
-						paginator
-						rows={5}
-						rowsPerPageOptions={[5, 10, Original_Api_data.length]}
-						tableStyle={{ minWidth: "50rem" }}
-						paginatorTemplate="RowsPerPageDropdown FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink"
-						currentPageReportTemplate="{first} to {last} of {totalRecords}"
-						scrollable
-						// scrollHeight="400px"
-						className="mt-4"
-						removableSort
-						value={Original_Api_data}
-						showGridlines
-						isDataSelectable={isRowSelectable}
-					>
-						<Column
-							style={{
-								maxWidth: "5rem",
-								minWidth: "5rem",
-								whitespace: "pre-wrap",
-							}}
-							field="Docket_Number"
-							header="Docket Number"
-						></Column>
-						<Column
-							style={{
-								maxWidth: "14rem",
-								minWidth: "14rem",
-								whiteSpace: "pre-wrap",
-							}}
-							field="Department"
-							header="Concerned Department"
-							sortable
-						></Column>
-						<Column
-							style={{
-								minWidth: "18rem",
-								maxWidth: "18rem",
-								whitespace: "pre-wrap",
-							}}
-							field="Subject"
-							header="subject of Concern"
-							sortable
-						></Column>
-						<Column
-							style={{
-								maxWidth: "12rem",
-								minWidth: "12rem",
-								whitespace: "pre-wrap",
-							}}
-							body={DescriptionBodyTemplate}
-							field="Breif"
-							header="Description"
-						></Column>
-						<Column
-							style={{
-								maxWidth: "11rem",
-								minWidth: "11rem",
-								whitespace: "pre-wrap",
-							}}
-							field="Input_Date"
-							header="Concern Raising Date & Time"
-							sortable
-						></Column>
+						</div>
+					</div>
 
-						<Column
-							style={{
-								maxWidth: "12rem",
-								minWidth: "12rem",
-								whitespace: "pre-wrap",
-							}}
-							body={filebutton}
-							field="File"
-							header="Relevant Attachments"
-							sortable
-						></Column>
-
-						<Column
-							style={{
-								maxWidth: "10rem",
-								minWidth: "10rem",
-								whitespace: "pre-wrap",
-							}}
-							body={ActionBodyTemplate}
-							field="Actions_Taken"
-							header="Actions Taken"
-							sortable
-						></Column>
-						<Column
-							style={{
-								maxWidth: "13rem",
-								minWidth: "13rem",
-								whitespace: "pre-wrap",
-							}}
-							body={Present_Status_Body_Template}
-							field="Present_Status"
-							header="Present Status"
-							sortable
-						></Column>
-
-						<Column
-							style={{
-								maxWidth: "13rem",
-								minWidth: "13rem",
-								whitespace: "pre-wrap",
-							}}
-							field="Data_Filled_by"
-							header="Data Filled by"
-							sortable
-						></Column>
-
-						{/* <Column
-              style={{
-                whitespace: "pre-wrap",
-              }}
-              field="User_Department"
-              header="User Department"
-              sortable
-            ></Column> */}
-					</DataTable>
+					{/* Logged Data Table Container */}
+					<div className="premium-card" hidden={show_table}>
+						<DataTable
+							paginator
+							rows={6}
+							rowsPerPageOptions={[6, 12, 24]}
+							tableStyle={{ minWidth: "50rem" }}
+							scrollable
+							className="p-datatable-striped"
+							removableSort
+							value={Original_Api_data}
+							showGridlines
+							isDataSelectable={isRowSelectable}
+						>
+							<Column
+								style={{ maxWidth: "6rem", minWidth: "6rem", fontWeight: 700 }}
+								field="Docket_Number"
+								header="Docket No."
+							></Column>
+							<Column
+								style={{ maxWidth: "14rem", minWidth: "14rem" }}
+								field="Department"
+								header="Target Department"
+								sortable
+							></Column>
+							<Column
+								style={{ minWidth: "16rem", maxWidth: "20rem" }}
+								field="Subject"
+								header="Subject"
+								sortable
+							></Column>
+							<Column
+								style={{ maxWidth: "10rem", minWidth: "10rem" }}
+								body={DescriptionBodyTemplate}
+								field="Breif"
+								header="Description"
+							></Column>
+							<Column
+								style={{ maxWidth: "11rem", minWidth: "11rem" }}
+								field="Input_Date"
+								header="Raising Date &amp; Time"
+								sortable
+							></Column>
+							<Column
+								style={{ maxWidth: "10rem", minWidth: "10rem" }}
+								body={filebutton}
+								field="File"
+								header="Attachments"
+							></Column>
+							<Column
+								style={{ maxWidth: "9rem", minWidth: "9rem" }}
+								body={ActionBodyTemplate}
+								field="Actions_Taken"
+								header="Actions"
+							></Column>
+							<Column
+								style={{ maxWidth: "12rem", minWidth: "12rem" }}
+								body={Present_Status_Body_Template}
+								field="Present_Status"
+								header="Status"
+								sortable
+							></Column>
+							<Column
+								style={{ maxWidth: "12rem", minWidth: "12rem", color: "var(--text-muted)", fontSize: "0.8rem" }}
+								field="Data_Filled_by"
+								header="Raised By"
+								sortable
+							></Column>
+						</DataTable>
+					</div>
 				</div>
-			</Fieldset>
+			)}
 
+			{/* Actions Timeline Dialog */}
 			<Dialog
 				maximized
 				maximizable
 				dismissableMask
-				header="Actions Taken so far"
+				header="Service Request Activity Logs"
 				visible={Action_box_show}
-				style={{ width: "50vw'" }}
+				style={{ width: "65vw" }}
 				onHide={() => {
 					setAction_box_show(false);
 					setComment_box_show(false);
@@ -1275,246 +1227,219 @@ function Data(params) {
 					// get_User_Input_data();
 				}}
 				footer={Action_box_footer}
+				className="premium-dialog"
 			>
-				<div className="flex flex-wrap gap-1 justify-content-between align-items-center">
-				<div className="field"></div>
-					<div className="field">
-						<span className="p-float-label">
-							<h4>1. Subject of the Service Request</h4>
-							<br />
-							<InputTextarea autoResize value={Subject} rows={2} cols={60} />
-						</span>
-					</div>
+				<div style={{ padding: "16px" }}>
+					<Container fluid style={{ padding: 0 }}>
+						<Row>
+							{/* Form Subject */}
+							<Col md={Dont_Hide_Status ? 6 : 12}>
+								<div className="premium-card" style={{ marginBottom: "20px" }}>
+									<span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>Subject Of Ticket</span>
+									<h3 style={{ margin: "8px 0 0 0", fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)" }}>{Subject}</h3>
+								</div>
+							</Col>
 
-					{Dont_Hide_Status ? (
-						<>
-							<div className="field">
-								<DataTable
-									style={{ width: "100%" }}
-									scrolldirection="horizontal"
-									responsivelayout="scroll"
-									value={row_Status_data}
-									showGridlines
-								>
-									<Column
-										style={{ minWidth: "10rem" }}
-										body={Old_Status_Body_Template}
-										field="Old_Status"
-										header="Past Status of the Reguest"
-									></Column>
-									<Column
-										style={{ minWidth: "10rem" }}
-										body={Present_Status_Body_Template}
-										field="Present_Status"
-										header="Present Status of the Request"
-									></Column>
-								</DataTable>
-							</div>
+							{/* Status Review Block (Visible when Resolved by handlers but not confirmed by User) */}
+							{Dont_Hide_Status && (
+								<Col md={6}>
+									<div className="premium-card" style={{ marginBottom: "20px", border: "1px solid var(--primary-light)", background: "rgba(99, 102, 241, 0.02)" }}>
+										<span style={{ fontSize: "0.8rem", color: "var(--primary-color)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>Status Confirmation Required</span>
+										<div className="flex align-items-center gap-3 mt-3 justify-content-between">
+											<div>
+												<span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Proposed: </span>
+												<Tag value={row_Status_data?.[0]?.Present_Status} severity="success" />
+											</div>
+											<div className="flex gap-2">
+												<Button
+													tooltip="Confirm that the service request is resolved"
+													severity="success"
+													raised
+													label="Approve &amp; Close"
+													icon="pi pi-check"
+													onClick={() => {
+														setUser_Status_Change_Acceptance(
+															"(Accepted the Status change from " +
+																row_Status_data[0].Old_Status +
+																" to " +
+																row_Status_data[0].Present_Status +
+																")"
+														);
+														row_Status_data[0]["Old_Status"] =
+															row_Status_data[0]["Present_Status"];
 
-							<div className="field">
-								<Button
-									tooltip="Click if issue is resolved"
-									severity="success"
-									raised
-									rounded
-									label="Approve"
-									icon="pi pi-check"
-									onClick={() => {
-										setUser_Status_Change_Acceptance(
-											"(Accepted the Status change from " +
-												row_Status_data[0].Old_Status +
-												" to " +
-												row_Status_data[0].Present_Status +
-												")"
-										);
-										row_Status_data[0]["Old_Status"] =
-											row_Status_data[0]["Present_Status"];
+														axios
+															.get("http://10.3.230.62:5050/UserInputStatusupdate", {
+																headers: {
+																	datas: JSON.stringify(row_Status_data),
+																},
+															})
+															.then((response) => {
+																if (response.data === "Success") {
+																	Original_row_Action_Data[0]["Old_Status"] =
+																		Original_row_Action_Data[0]["Present_Status"];
 
-										axios
-											.get("http://10.3.230.62:5050/UserInputStatusupdate", {
-												headers: {
-													datas: JSON.stringify(row_Status_data),
-												},
-											})
-											.then((response) => {
-												if (response.data === "Success") {
-													Original_row_Action_Data[0]["Old_Status"] =
-														Original_row_Action_Data[0]["Present_Status"];
+																	setTicket_closed(true);
+																	setDont_Hide_Status(false);
+																	toast.current.show({
+																		severity: "success",
+																		detail: "Ticket Closed Successfully",
+																		life: 3000,
+																	});
+																} else {
+																	toast.current.show({
+																		severity: "error",
+																		summary: "Cancelled",
+																		detail: "Update Failed",
+																		life: 3000,
+																	});
+																}
+															})
+															.catch((error) => {});
+													}}
+												/>
+												<Button
+													tooltip="Reopen or dispute the resolution status"
+													severity="danger"
+													raised
+													label="Deny Resolution"
+													icon="pi pi-times"
+													onClick={() => {
+														setUser_Status_Change_Acceptance(
+															"(Rejected the Status change from " +
+																row_Status_data[0]["Old_Status"] +
+																" to " +
+																row_Status_data[0]["Present_Status"] +
+																")"
+														);
+														row_Status_data[0]["Present_Status"] =
+															row_Status_data[0]["Old_Status"];
 
-													// setStatus_updated(true);
-													setTicket_closed(true);
-													setDont_Hide_Status(false);
-													toast.current.show({
-														severity: "success",
-														detail: "Comment Added",
-														life: 3000,
-													});
-												} else {
-													// setStatus_updated(false);
-													toast.current.show({
-														severity: "error",
-														summary: "Cancelled",
-														detail: "Update Cancelled",
-														life: 3000,
-													});
-												}
-											})
-											.catch((error) => {});
+														axios
+															.get("http://10.3.230.62:5050/UserInputStatusupdate", {
+																headers: {
+																	datas: JSON.stringify(row_Status_data),
+																},
+															})
+															.then((response) => {
+																if (response.data === "Success") {
+																	Original_row_Action_Data[0]["Present_Status"] =
+																		Original_row_Action_Data[0]["Old_Status"];
 
-										toast.current.show({
-											severity: "success",
+																	setTicket_closed(false);
+																	setDont_Hide_Status(false);
+																	toast.current.show({
+																		severity: "success",
+																		detail: "Ticket Dispute Registered",
+																		life: 3000,
+																	});
+																} else {
+																	toast.current.show({
+																		severity: "error",
+																		summary: "Cancelled",
+																		detail: "Dispute Failed",
+																		life: 3000,
+																	});
+																}
+															})
+															.catch((error) => {});
+													}}
+												/>
+											</div>
+										</div>
+									</div>
+								</Col>
+							)}
+						</Row>
 
-											summary: "Accepted",
+						<Row>
+							{/* Form Description */}
+							<Col sm={12}>
+								<div className="premium-card" style={{ marginBottom: "28px" }}>
+									<span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>Problem Details</span>
+									<p style={{ margin: "12px 0 0 0", fontSize: "0.95rem", lineHeight: 1.6, color: "var(--text-main)", whiteSpace: "pre-line" }}>{Brief}</p>
+								</div>
+							</Col>
+						</Row>
 
-											detail: "This Action is Irreversible",
+						{/* Audit / Timeline Section */}
+						<Row>
+							<Col sm={12}>
+								<div className="premium-card">
+									<span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "24px" }}>Action Timeline &amp; Remarks</span>
+									
+									<Timeline
+										value={row_Action_Data}
+										layout="vertical"
+										className="customized-timeline"
+										content={(item) => (
+											<div className="premium-card" style={{ padding: "16px 20px", marginBottom: "16px", borderLeft: "4px solid var(--primary-color)", boxShadow: "var(--shadow-sm)" }}>
+												<div className="flex align-items-center justify-content-between mb-2">
+													<strong style={{ fontSize: "0.9rem", color: "var(--text-main)" }}>{item.Name}</strong>
+													<span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}><i className="pi pi-clock mr-1" />{item.Date}</span>
+												</div>
+												<p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{item.Action}</p>
+											</div>
+										)}
+									/>
+								</div>
+							</Col>
+						</Row>
 
-											life: 3000,
-										});
-									}}
-									autoFocus
-								/>
-								<div className="field"></div>
-								<Button
-									tooltip="Click if issue isn't resolved"
-									style={{ backgroundColor: "red", color: "white" }}
-									severity="danger"
-									raised
-									rounded
-									label="Deny"
-									icon="pi pi-times"
-									onClick={() => {
-										setUser_Status_Change_Acceptance(
-											"(Rejected the Status change from " +
-												row_Status_data[0]["Old_Status"] +
-												" to " +
-												row_Status_data[0]["Present_Status"] +
-												")"
-										);
-										row_Status_data[0]["Present_Status"] =
-											row_Status_data[0]["Old_Status"];
-
-										axios
-											.get("http://10.3.230.62:5050/UserInputStatusupdate", {
-												headers: {
-													datas: JSON.stringify(row_Status_data),
-												},
-											})
-											.then((response) => {
-												if (response.data === "Success") {
-													Original_row_Action_Data[0]["Present_Status"] =
-														Original_row_Action_Data[0]["Old_Status"];
-
-													// setStatus_updated(true);
-													setTicket_closed(false);
-													setDont_Hide_Status(false);
-													toast.current.show({
-														severity: "success",
-														detail: "Comment Added",
-														life: 3000,
-													});
-												} else {
-													toast.current.show({
-														severity: "error",
-														summary: "Cancelled",
-														detail: "Update Cancelled",
-														life: 3000,
-													});
-												}
-											})
-											.catch((error) => {});
-										toast.current.show({
-											severity: "error",
-											summary: "Rejected",
-											detail: "This Action is Irreversible",
-											life: 3000,
-										});
-									}}
-									className="p-button-text"
-								/>
-							</div>
-							<div className="field"></div>
-						</>
-					) : (
-						<><div className="field"></div>
-						<div className="field"></div>
-						<div className="field"></div>
-						</>
-						
-					)}
-
-					<Divider />
-					<div className="field"></div>
-					<div className="field">
-						<span className="p-float-label">
-							<h4>2. Brief Description of the Service Request</h4>
-							<br />
-							<InputTextarea autoResize value={Brief} rows={5} cols={175} />
-						</span>
-					</div>
-					<div className="field"></div>
-
-					<Divider />
-					<div className="field"></div>
-					<div className="field">
-						<div className="card">
-							<Timeline
-								value={row_Action_Data}
-								layout="vertical"
-								// align="alternate"
-								className="customized-timeline"
-								content={customizedContent}
-							/>
-						</div>
-					</div>
-					<div className="field"></div>
-					<Divider />
-					<div className="field"></div>
-					<div className="field" hidden={!Comment_box_show}>
-						<h4>Enter your Remarks</h4>
-						<InputTextarea
-							hidden={!Comment_box_show}
-							autoResize
-							value={Action_Comment_Box}
-							onChange={(e) => setAction_Comment_Box(e.target.value)}
-							rows={2}
-							cols={180}
-						/>
-					</div>
-					<div className="field"></div>
+						{/* Add Remarks field */}
+						<Row hidden={!Comment_box_show}>
+							<Col sm={12}>
+								<div className="premium-card animate-fade-in" style={{ border: "1px solid var(--primary-light)", background: "rgba(99, 102, 241, 0.01)" }}>
+									<h4 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "12px" }}>Write Remarks / Comment</h4>
+									<InputTextarea
+										autoResize
+										value={Action_Comment_Box || ""}
+										onChange={(e) => setAction_Comment_Box(e.target.value)}
+										rows={3}
+										className="w-full"
+										placeholder="Input actions taken, status updates or remarks..."
+									/>
+								</div>
+							</Col>
+						</Row>
+					</Container>
 				</div>
 			</Dialog>
 
-			<div className="card flex justify-content-center">
-				<Dialog
-					header="Edit Description"
-					visible={Description_visible}
-					onHide={() => {
-						setDescription_visible(false);
-						setDescription_button_click_no(0);
-						setDescription_Edit_Button_Name("Enable Editing");
-						setDescription_Edit_Enable(false);
-					}}
-					style={{ width: "30vw" }}
-					breakpoints={{ "960px": "75vu", "641px": "100vw" }}
-					footer={Description_box_footer}
-				>
-					<div className="card flex justify-content-center">
-						<InputTextarea
-							autoResize
-							value={Description_Field_box}
-							onChange={(e) => {
-								if (Description_Edit_Enable) {
-									setDescription_Field_box(e.target.value);
-								}
-							}}
-							rows={2}
-							cols={80}
-							// disabled={!Description_Edit_Enable}
-						/>
-					</div>
-				</Dialog>
-			</div>
+			{/* Edit Description Dialog */}
+			<Dialog
+				header="Modify Request Description"
+				visible={Description_visible}
+				onHide={() => {
+					setDescription_visible(false);
+					setDescription_button_click_no(0);
+					setDescription_Edit_Button_Name("Enable Editing");
+					setDescription_Edit_Enable(false);
+				}}
+				style={{ width: "480px" }}
+				footer={Description_box_footer}
+				className="premium-dialog"
+			>
+				<div className="py-4">
+					<p style={{ margin: "0 0 16px 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>Modify details of the raise ticket. Save changes once editing is active.</p>
+					<InputTextarea
+						autoResize
+						value={Description_Field_box || ""}
+						onChange={(e) => {
+							if (Description_Edit_Enable) {
+								setDescription_Field_box(e.target.value);
+							}
+						}}
+						rows={5}
+						className="w-full"
+						placeholder="Description box content..."
+						readOnly={!Description_Edit_Enable}
+						style={{ cursor: Description_Edit_Enable ? "text" : "not-allowed" }}
+					/>
+				</div>
+			</Dialog>
 		</>
 	);
 }
+
 export default Data;

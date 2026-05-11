@@ -23,6 +23,7 @@ import { Card } from "primereact/card";
 import moment from "moment";
 import { Badge } from "primereact/badge";
 import { InputSwitch } from "primereact/inputswitch";
+import { Avatar } from "primereact/avatar";
 import "../cssfiles/Animation.css";
 
 function Department(params) {
@@ -597,278 +598,317 @@ function Department(params) {
 	return (
 		<>
 			<Toast ref={toast} />
-			<Fieldset hidden={!pageHide}>
-				<div className="card flex justify-content-center">
-					<h1>Please Login again by SSO</h1>
+
+			{/* Session Expired / Unauthorized Access Page */}
+			{pageHide && (
+				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+					<div className="premium-card text-center" style={{ maxWidth: "480px", padding: "40px" }}>
+						<Avatar icon="pi pi-lock" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(244, 63, 94, 0.1)", color: "var(--danger-color)", width: "80px", height: "80px", fontSize: "36px", margin: "0 auto 24px auto" }} />
+						<h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "12px" }}>Authentication Required</h2>
+						<p style={{ color: "var(--text-muted)", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "32px" }}>
+							Please log in securely via the Single Sign-On (SSO) gateway.
+						</p>
+						<Button 
+							label="Go to SSO Login" 
+							icon="pi pi-sign-in" 
+							className="p-button-danger w-full"
+							onClick={() => window.location = "https://sso.erldc.in"}
+						/>
+					</div>
 				</div>
-			</Fieldset>
+			)}
+
 			<ConfirmDialog
 				visible={editConfirmBox}
 				onHide={() => setEditConfirmBox(false)}
-				message="Are you sure you want to Update Status?"
-				header="Confirm Update"
+				message="Are you sure you want to update this ticket's status?"
+				header="Confirm Status Update"
 				icon="pi pi-exclamation-triangle"
 				accept={accept}
 				reject={reject}
 			/>
-			<Fieldset
-				hidden={pageHide}
-				legend={
-					<div className="flex align-items-center ">
-						<span
-							className="pi pi-eye"
-							style={{ fontWeight: "bold", fontSize: "small" }}
-						></span>
-						<span>Department Data</span>
+
+			{!pageHide && (
+				<div style={{ padding: "16px 2.2% 40px 2.2%" }}>
+					{/* Header section */}
+					<div className="flex align-items-center gap-3 mb-4" style={{ paddingLeft: "8px" }}>
+						<Avatar icon="pi pi-eye" style={{ backgroundColor: "rgba(99, 102, 241, 0.1)", color: "var(--primary-color)" }} shape="circle" />
+						<div>
+							<h1 style={{ textAlign: "left", padding: 0, margin: 0, fontSize: "1.6rem", fontWeight: 800 }}>Department Actions Panel</h1>
+							<span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>View, respond and manage assigned service tickets</span>
+						</div>
 					</div>
-				}
-			>
-				<div className="card flex justify-content-center" hidden={!isAdmin}>
-					<h4
-						hidden={!isAdmin}
-						style={{ marginTop: "-1.5%", marginLeft: "-1%" }}
-					>
-						Admin Mode
-					</h4>
-					<br />
-					<div hidden={!isAdmin} style={{ marginLeft: "-4%" }}>
-						<InputSwitch
-							disabled={!isAdmin}
-							style={{ marginLeft: "-6%" }}
-							checked={adminChecked}
-							onChange={(e) => setAdminChecked(e.value)}
-						/>
-					</div>
-				</div>
-				<br />
-				<div className="card flex justify-content-center">
-					<Button
-						icon="pi pi-download"
-						severity="success"
-						raised
-						rounded
-						label={loading ? "Loading..." : "Fetch Department Data"}
-						aria-label="Your Data"
-						onClick={getUserInputData}
-						disabled={loading}
-					/>
-				</div>
-				<div
-					className="card"
-					hidden={!showTable}
-					style={{ width: "auto", whiteSpace: "nowrap" }}
-				>
-					<DataTable
-						style={{ width: "100%" }}
-						paginator
-						rows={10}
-						rowsPerPageOptions={[5, 10, 20, initialApiData.length]}
-						tableStyle={{ minWidth: "50rem" }}
-						paginatorTemplate="RowsPerPageDropdown FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink"
-						currentPageReportTemplate="{first} to {last} of {totalRecords}"
-						scrollable
-						removableSort
-						value={initialApiData}
-						showGridlines
-						loading={loading}
-						header={header}
-						globalFilter={globalFilter}
-						emptyMessage="No records found."
-					>
-						<Column
-							field="Docket_Number"
-							header="Docket Number"
-							style={{
-								maxWidth: "5rem",
-								minWidth: "5rem",
-								whiteSpace: "pre-wrap",
-							}}
-						/>
-						<Column
-							field="Department"
-							header="Concerned Department"
-							sortable
-							style={{ minWidth: "14rem", whiteSpace: "pre-wrap" }}
-						/>
-						<Column
-							field="Subject"
-							header="Subject"
-							sortable
-							style={{ maxWidth: "18rem", whiteSpace: "pre-wrap", height:"auto" }}
-						/>
-						<Column
-							body={descriptionBodyTemplate}
-							field="Breif"
-							header="Description"
-							style={{ minWidth: "8rem", whiteSpace: "pre-wrap" }}
-						/>
-						<Column
-							field="Input_Date"
-							header="Concern Raising Date & Time"
-							sortable
-							style={{ minWidth: "10rem", whiteSpace: "pre-wrap" }}
-						/>
-						<Column
-							body={fileButton}
-							field="File"
-							header="Relevant Attachments"
-							sortable
-							style={{ minWidth: "13rem", whiteSpace: "pre-wrap" }}
-						/>
-						<Column
-							body={actionBodyTemplate}
-							field="Actions_Taken"
-							header="Actions Taken"
-							style={{ minWidth: "12rem", whiteSpace: "pre-wrap" }}
-						/>
-						<Column
-							body={(rowData) => (
-								<Tag
-									value={rowData.Present_Status}
-									severity={getSeverity(rowData.Present_Status)}
+
+					{/* Control Dashboard Card */}
+					<div className="premium-card" style={{ padding: "20px 32px", marginBottom: "24px" }}>
+						<div className="flex flex-column md:flex-row align-items-center justify-content-between gap-4">
+							
+							{/* Admin Mode Toggle */}
+							<div style={{ opacity: isAdmin ? 1 : 0.4, pointerEvents: isAdmin ? "auto" : "none" }}>
+								<div className="flex align-items-center gap-3">
+									<i className="pi pi-shield" style={{ fontSize: "1.2rem", color: "var(--danger-color)" }}></i>
+									<div>
+										<span style={{ fontSize: "0.85rem", fontWeight: "700", display: "block" }}>Admin Panel Override</span>
+										<span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Access all departmental issues</span>
+									</div>
+									<InputSwitch
+										disabled={!isAdmin}
+										checked={adminChecked}
+										onChange={(e) => setAdminChecked(e.value)}
+									/>
+								</div>
+							</div>
+
+							{/* Fetch Button */}
+							<div>
+								<Button
+									icon="pi pi-download"
+									severity="success"
+									raised
+									label={loading ? "Fetching Data..." : "Fetch Department Data"}
+									onClick={getUserInputData}
+									disabled={loading}
+									style={{ padding: "12px 28px" }}
 								/>
-							)}
-							field="Present_Status"
-							header="Present Status"
-							sortable
-							style={{ minWidth: "15rem", whiteSpace: "pre-wrap" }}
-						/>
-						<Column
-							field="Data_Filled_by"
-							header="Data Filled by"
-							sortable
-							style={{ minWidth: "13rem", whiteSpace: "pre-wrap" }}
-						/>
-						<Column
-							field="User_Department"
-							header="User Department"
-							sortable
-							style={{ minWidth: "9rem", whiteSpace: "pre-wrap" }}
-						/>
-					</DataTable>
+							</div>
+
+							{/* Department Tag info */}
+							<div className="flex align-items-center gap-2">
+								<span className="text-sm font-semibold" style={{ color: "var(--text-muted)" }}>Scope:</span>
+								<Tag style={{ background: "rgba(99, 102, 241, 0.08)", color: "var(--primary-color)", border: "1px solid var(--primary-light)", fontSize: "0.9rem", padding: "6px 16px" }} value={selectedDepartment} />
+							</div>
+
+						</div>
+					</div>
+
+					{/* Logged Data Table Container */}
+					<div className="premium-card" hidden={!showTable}>
+						<DataTable
+							style={{ width: "100%" }}
+							paginator
+							rows={8}
+							rowsPerPageOptions={[8, 16, 32, initialApiData.length]}
+							tableStyle={{ minWidth: "50rem" }}
+							scrollable
+							className="p-datatable-striped"
+							removableSort
+							value={initialApiData}
+							showGridlines
+							loading={loading}
+							header={header}
+							globalFilter={globalFilter}
+							emptyMessage="No departmental tickets found."
+						>
+							<Column
+								field="Docket_Number"
+								header="Docket No."
+								sortable
+								style={{ maxWidth: "6rem", minWidth: "6rem", fontWeight: 700 }}
+							/>
+							<Column
+								field="Department"
+								header="Concerned Department"
+								sortable
+								style={{ minWidth: "14rem" }}
+							/>
+							<Column
+								field="Subject"
+								header="Subject"
+								sortable
+								style={{ minWidth: "16rem", maxWidth: "20rem" }}
+							/>
+							<Column
+								body={descriptionBodyTemplate}
+								field="Breif"
+								header="Description"
+								style={{ minWidth: "8rem" }}
+							/>
+							<Column
+								field="Input_Date"
+								header="Raising Date &amp; Time"
+								sortable
+								style={{ minWidth: "11rem" }}
+							/>
+							<Column
+								body={fileButton}
+								field="File"
+								header="Attachments"
+								style={{ minWidth: "10rem" }}
+							/>
+							<Column
+								body={actionBodyTemplate}
+								field="Actions_Taken"
+								header="Actions"
+								style={{ minWidth: "10rem" }}
+							/>
+							<Column
+								body={(rowData) => (
+									<Tag
+										value={rowData.Present_Status}
+										severity={getSeverity(rowData.Present_Status)}
+									/>
+								)}
+								field="Present_Status"
+								header="Present Status"
+								sortable
+								style={{ minWidth: "12rem" }}
+							/>
+							<Column
+								field="Data_Filled_by"
+								header="Data Filled by"
+								sortable
+								style={{ minWidth: "12rem", color: "var(--text-muted)", fontSize: "0.8rem" }}
+							/>
+							<Column
+								field="User_Department"
+								header="User Department"
+								sortable
+								style={{ minWidth: "11rem", color: "var(--text-muted)", fontSize: "0.8rem" }}
+							/>
+						</DataTable>
+					</div>
 				</div>
-			</Fieldset>
+			)}
+
+			{/* Actions / Remarks Details Dialog */}
 			<Dialog
 				maximized
 				maximizable
 				dismissableMask
-				header="Actions Taken so far"
+				header="Ticket Management &amp; Audit Logs"
 				visible={actionsVisible}
-				style={{ width: "50vw" }}
+				style={{ width: "65vw" }}
 				onHide={handleDialogBack}
 				footer={actionFooterContent}
+				className="premium-dialog"
 			>
-				<div className="flex flex-wrap gap-1 justify-content-between align-items-center">
-					<div className="field">
-						<span className="p-float-label">
-							<h4>1. Subject of the Service Request</h4>
-							<InputTextarea
-								autoResize
-								value={subject}
-								rows={2}
-								cols={70}
-								disabled
-							/>
-						</span>
-					</div>
-					<div className="field">
-						<span className="p-float-label">
-							<h4>2. Present Status of the Service Request</h4>
-							<DataTable
-								style={{ width: "100%" }}
-								value={actionStatusData}
-								showGridlines
-								editMode="row"
-								dataKey="id"
-								onRowEditComplete={actionStatusEditComplete}
-								onRowEditCancel={reject}
-								onRowEditInit={() =>
-									toast.current.show({
-										severity: "info",
-										summary: "Editing Started",
-										detail: "Carefully Edit Data",
-										life: 2000,
-									})
-								}
-							>
-								<Column
-									hidden={ticketClosed}
-									align="center"
-									rowEditor
-									header="Edit Service Status"
-									frozen
-									className="font-bold"
-								/>
-								<Column
-									body={(rowData) => (
-										<Tag
-											value={rowData.Present_Status}
-											severity={getSeverity(rowData.Present_Status)}
-										/>
-									)}
-									header="Present Status"
-									editor={statusEditor}
-								/>
-							</DataTable>
-						</span>
-					</div>
-					<div className="field">
-						<span className="p-float-label">
-							<h4>3. Brief Description of the Service Request</h4>
-							<InputTextarea
-								autoResize
-								value={brief}
-								rows={5}
-								cols={150}
-								disabled
-							/>
-						</span>
-					</div>
+				<div style={{ padding: "16px" }}>
+					<Container fluid style={{ padding: 0 }}>
+						<Row>
+							{/* Form Subject Card */}
+							<Col md={6}>
+								<div className="premium-card" style={{ marginBottom: "20px" }}>
+									<span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>Subject Of Request</span>
+									<h3 style={{ margin: "8px 0 0 0", fontSize: "1.1rem", fontWeight: "700", color: "var(--text-main)" }}>{subject}</h3>
+								</div>
+							</Col>
+
+							{/* Present Status & Edit block */}
+							<Col md={6}>
+								<div className="premium-card" style={{ marginBottom: "20px" }}>
+									<span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>Ticket Resolution Status</span>
+									<div className="mt-2">
+										<DataTable
+											style={{ width: "100%" }}
+											value={actionStatusData}
+											showGridlines
+											editMode="row"
+											dataKey="id"
+											onRowEditComplete={actionStatusEditComplete}
+											onRowEditCancel={reject}
+											onRowEditInit={() =>
+												toast.current.show({
+													severity: "info",
+													summary: "Editing Started",
+													detail: "Modify ticket status and save when done.",
+													life: 2000,
+												})
+											}
+										>
+											<Column
+												hidden={ticketClosed}
+												align="center"
+												rowEditor
+												header="Modify Status"
+												frozen
+												className="font-bold"
+												style={{ width: "100px" }}
+											/>
+											<Column
+												body={(rowData) => (
+													<Tag
+														value={rowData.Present_Status}
+														severity={getSeverity(rowData.Present_Status)}
+														style={{ fontSize: "0.9rem", padding: "6px 12px" }}
+													/>
+												)}
+												header="Active Status State"
+												editor={statusEditor}
+											/>
+										</DataTable>
+									</div>
+								</div>
+							</Col>
+						</Row>
+
+						<Row>
+							{/* Form Description */}
+							<Col sm={12}>
+								<div className="premium-card" style={{ marginBottom: "28px" }}>
+									<span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>Detailed Request Brief</span>
+									<p style={{ margin: "12px 0 0 0", fontSize: "0.95rem", lineHeight: 1.6, color: "var(--text-main)", whiteSpace: "pre-line" }}>{brief}</p>
+								</div>
+							</Col>
+						</Row>
+
+						{/* Audit / Timeline Section */}
+						<Row>
+							<Col sm={12}>
+								<div className="premium-card">
+									<span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", display: "block", marginBottom: "24px" }}>Action Timeline &amp; Remarks Log</span>
+									
+									<Timeline
+										value={action}
+										layout="vertical"
+										className="customized-timeline"
+										content={(item) => (
+											<div className="premium-card" style={{ padding: "16px 20px", marginBottom: "16px", borderLeft: "4px solid var(--primary-color)", boxShadow: "var(--shadow-sm)" }}>
+												<div className="flex align-items-center justify-content-between mb-2">
+													<strong style={{ fontSize: "0.9rem", color: "var(--text-main)" }}>{item.Name}</strong>
+													<span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}><i className="pi pi-clock mr-1" />{item.Date}</span>
+												</div>
+												<p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-muted)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{item.Action}</p>
+											</div>
+										)}
+									/>
+								</div>
+							</Col>
+						</Row>
+
+						{/* Add Action Comment Panel */}
+						<Row hidden={ticketClosed}>
+							<Col sm={12} hidden={!commentShow}>
+								<div className="premium-card animate-fade-in" style={{ marginTop: "24px", border: "1px solid var(--primary-light)", background: "rgba(99, 102, 241, 0.01)" }}>
+									<h4 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "12px" }}>Input Handling Remarks</h4>
+									<InputTextarea
+										autoResize
+										value={actionComments}
+										onChange={(e) => setActionComments(e.target.value)}
+										rows={3}
+										className="w-full"
+										placeholder="Describe actions taken, resolutions details, or queries to the user..."
+									/>
+								</div>
+							</Col>
+						</Row>
+					</Container>
 				</div>
-				<Divider />
-				<Container>
-					<Row>
-						<div className="card">
-							<Timeline
-								value={action}
-								layout="vertical"
-								className="customized-timeline"
-								content={customizedContent}
-							/>
-						</div>
-					</Row>
-				</Container>
-				<Divider />
-				<Container hidden={ticketClosed}>
-					<Row>
-						<Col sm={12} hidden={!commentShow}>
-							<div
-								className="card flex justify-content-center"
-								style={{ marginLeft: "-4%" }}
-							>
-								<b>Enter your Remarks</b>
-								<InputTextarea
-									autoResize
-									value={actionComments}
-									onChange={(e) => setActionComments(e.target.value)}
-									rows={2}
-									cols={220}
-								/>
-							</div>
-						</Col>
-					</Row>
-				</Container>
 			</Dialog>
+
+			{/* View Description Dialog */}
 			<Dialog
 				resizable
-				header="Description"
+				header="Detailed Brief"
 				visible={descVisible}
 				onHide={() => setDescVisible(false)}
-				style={{ width: "50vw" }}
-				breakpoints={{ "960px": "75vw", "641px": "100vw" }}
+				style={{ width: "480px" }}
+				className="premium-dialog"
 			>
-				<div className="card flex justify-content-center">
-					<InputTextarea autoResize value={desc} rows={2} cols={110} disabled />
+				<div className="py-4">
+					<p style={{ margin: "0 0 16px 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>Ticket submission description detail:</p>
+					<div className="premium-card" style={{ background: "rgba(0,0,0,0.015)", border: "1px solid rgba(0,0,0,0.05)", padding: "16px 20px" }}>
+						<p style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.6, color: "var(--text-main)", whiteSpace: "pre-line" }}>{desc}</p>
+					</div>
 				</div>
 			</Dialog>
 		</>

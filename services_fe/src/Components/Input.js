@@ -13,6 +13,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Dialog } from "primereact/dialog";
 import moment from "moment";
 import { FileUpload } from "primereact/fileupload";
+import { Avatar } from "primereact/avatar";
+import { Badge } from "primereact/badge";
 
 function Input(params) {
 	const search = useLocation().search;
@@ -365,231 +367,241 @@ function Input(params) {
 
 	return (
 		<>
+			{/* Success Confirmation Dialog */}
 			<Dialog
-				header="Attention"
+				header="Registration Success"
 				visible={success_insert}
-				style={{ width: "50vw" }}
+				style={{ width: "450px" }}
 				onHide={() => setsuccess_insert(false)}
 				footer={inserted_footerContent}
+				className="premium-dialog"
 			>
-				<p className="m-0">
-					Service Request for {Selected_department} Department is seccessfully
-					registered on {moment().format("DD-MM-YYYY hh:mm a")} by{" "}
-					{Person_Name + " (" + User_id + ")"} with Docket Number {Docket_No}.
-					<br></br>
-					Click OK to View your Logged Service Requests
-				</p>
+				<div className="text-center py-4">
+					<Avatar icon="pi pi-check-circle" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(16, 185, 129, 0.1)", color: "var(--success-color)", width: "64px", height: "64px", fontSize: "28px", margin: "0 auto 16px auto" }} />
+					<p className="m-0" style={{ fontSize: "0.95rem", lineHeight: 1.6, color: "var(--text-main)" }}>
+						Service Request for <strong style={{ color: "var(--primary-color)" }}>{Selected_department}</strong> has been successfully registered!
+					</p>
+					<div className="my-3 p-3" style={{ background: "var(--bg-color)", borderRadius: "var(--border-radius-sm)", border: "1px solid var(--border-color)" }}>
+						<span style={{ fontSize: "0.85rem", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>Docket Number</span>
+						<strong style={{ fontSize: "1.2rem", color: "var(--text-main)", fontFamily: "var(--font-heading)", letterSpacing: "1px" }}>{Docket_No}</strong>
+					</div>
+					<span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Registered on {moment().format("DD-MM-YYYY hh:mm a")} by {Person_Name}</span>
+				</div>
 			</Dialog>
-			<div className="card flex justify-content-center">
-				<Dialog
-					header="Departments"
-					visible={visible1}
-					style={{ width: "20vw" }}
-					breakpoints={{ "960px": "75vw", "641px": "100vw" }}
-				></Dialog>
 
-				<Dialog
-					header="Departments"
-					visible={visible1}
-					style={{ width: "20vw" }}
-					breakpoints={{ "960px": "75vw", "641px": "100vw" }}
-				></Dialog>
+			{/* Department Selection Dialog */}
+			<Dialog
+				header="Select Target Department"
+				visible={visible1 && !page_hide}
+				onHide={() => setVisible1(false)}
+				style={{ width: "320px" }}
+				breakpoints={{ "960px": "75vw", "641px": "100vw" }}
+				className="premium-dialog"
+			>
+				<div className="py-4">
+					<p style={{ margin: "0 0 16px 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>Choose which department is responsible for resolving your issue:</p>
+					<Dropdown
+						value={Selected_department_dropdown}
+						onChange={(e) => {
+							setSelected_department_dropdown(e.value);
+							setVisible1(false);
+							setVisible2(true);
+						}}
+						options={Department}
+						optionLabel="name"
+						placeholder="Select Department"
+						className="w-full"
+					/>
+				</div>
+			</Dialog>
 
+			{/* Division Selection Dialog */}
+			{Selected_department_dropdown && (
 				<Dialog
-					header="Complaint Against Department"
-					visible={visible1 && !page_hide}
-					onHide={() => setVisible1(false)}
-					style={{ width: "20vw" }}
+					header={`${Selected_department_dropdown["name"]} - Select Division`}
+					visible={visible2}
+					onHide={() => setVisible2(false)}
+					style={{ width: "360px" }}
 					breakpoints={{ "960px": "75vw", "641px": "100vw" }}
+					className="premium-dialog"
 				>
-					<div className="card flex justify-content-center">
+					<div className="py-4">
+						<p style={{ margin: "0 0 16px 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>Specify the divisions/groups within this department:</p>
 						<Dropdown
-							value={Selected_department_dropdown}
+							value={Selected_division_dropdown}
 							onChange={(e) => {
-								setSelected_department_dropdown(e.value);
-								setVisible1(false);
-								setVisible2(true);
+								setSelected_division_dropdown(e.value);
+								setVisible2(false);
 							}}
-							options={Department}
+							options={division_dropdown}
 							optionLabel="name"
-							placeholder="select Department"
-							className="w-full md:w-14rem"
+							placeholder="Select Division"
+							className="w-full"
 						/>
 					</div>
 				</Dialog>
-			</div>
-
-			{Selected_department_dropdown ? (
-				<>
-					<div className="card flex justify-content-center">
-						<Dialog
-							header={Selected_department_dropdown["name"] + " Division"}
-							visible={visible2}
-							style={{ width: "30vw" }}
-							breakpoints={{ "960px": "75vu", "641px": "100vw" }}
-						>
-							<div className="card flex justify-content-center">
-								<Dropdown
-									value={Selected_division_dropdown}
-									onChange={(e) => {
-										setSelected_division_dropdown(e.value);
-										setVisible2(false);
-									}}
-									options={division_dropdown}
-									optionLabel="name"
-									placeholder="select Division"
-									className="w-full md:w-14rem"
-								/>
-							</div>
-						</Dialog>
-					</div>
-				</>
-			) : (
-				<></>
 			)}
 
+			{/* Unauthorized Access Page */}
 			{page_hide && (
-				<Fieldset>
-					<div className="card flex justify-content-center">
-						<h1>Please Login again by SSO</h1>
+				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+					<div className="premium-card text-center" style={{ maxWidth: "480px", padding: "40px" }}>
+						<Avatar icon="pi pi-lock" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(244, 63, 94, 0.1)", color: "var(--danger-color)", width: "80px", height: "80px", fontSize: "36px", margin: "0 auto 24px auto" }} />
+						<h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "12px" }}>Authentication Required</h2>
+						<p style={{ color: "var(--text-muted)", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "32px" }}>
+							Please log in securely via the Single Sign-On (SSO) gateway.
+						</p>
+						<Button 
+							label="Go to SSO Login" 
+							icon="pi pi-sign-in" 
+							className="p-button-danger w-full"
+							onClick={() => window.location = "https://sso.erldc.in"}
+						/>
 					</div>
-				</Fieldset>
+				</div>
 			)}
 
+			{/* Form Layout */}
 			{!page_hide && (
-				<Fieldset
-					hidden={page_hide}
-					legend={
-						<div className="flex align-items-center ">
-							<span
-								className="pi pi-spin pi-cog"
-								style={{ fontWeight: "bold", fontSize: "small" }}
-							></span>
-							<span>Service Request Input</span>
+				<div style={{ padding: "16px 2.2% 40px 2.2%" }}>
+					<div className="flex align-items-center gap-3 mb-4" style={{ paddingLeft: "8px" }}>
+						<Avatar icon="pi pi-plus" style={{ backgroundColor: "rgba(79, 70, 229, 0.1)", color: "var(--primary-color)" }} shape="circle" />
+						<div>
+							<h1 style={{ textAlign: "left", padding: 0, margin: 0, fontSize: "1.6rem", fontWeight: 800 }}>Create New Service Request</h1>
+							<span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Carefully provide relevant information below to raise a ticket</span>
 						</div>
-					}
-				>
-					<Container>
-						<Row>
-							<Col sm={6}>
-								<div className="card flex justify-content-left">
-									<span className="p-float-label">
-										<h3>1. Concerned Department/ Division</h3>
+					</div>
 
+					<Container fluid style={{ padding: 0 }}>
+						<Row>
+							{/* Step 1: Concerned Department */}
+							<Col md={6}>
+								<div className="premium-card" style={{ height: "calc(100% - 24px)" }}>
+									<div className="flex align-items-center gap-2 mb-3">
+										<Badge value="1" severity="info" style={{ borderRadius: "50%", width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }} />
+										<h3 style={{ margin: 0, fontWeight: 700 }}>Target Department &amp; Division</h3>
+									</div>
+									<p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "16px" }}>Click inside the field below to select the department and division responsible for this request.</p>
+									<span className="p-float-label">
 										<InputTextarea
-											value={Selected_department}
-											className="w-full md:w-26rem"
+											value={Selected_department || ""}
+											className="w-full"
 											rows={2}
-											onClick={(e) => setVisible1(true)}
+											onClick={() => setVisible1(true)}
+											placeholder="Click here to select department..."
+											readOnly
+											style={{ cursor: "pointer", borderStyle: "dashed" }}
 										/>
 									</span>
 								</div>
 							</Col>
 
-							<Col sm={6}>
-								<div
-									className="card flex justify-content-right"
-									style={{ marginLeft: "14%" }}
-								>
+							{/* Step 2: Subject */}
+							<Col md={6}>
+								<div className="premium-card" style={{ height: "calc(100% - 24px)" }}>
+									<div className="flex align-items-center gap-2 mb-3">
+										<Badge value="2" severity="info" style={{ borderRadius: "50%", width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }} />
+										<h3 style={{ margin: 0, fontWeight: 700 }}>Subject of Service Request</h3>
+									</div>
+									<p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "16px" }}>Enter a short, descriptive summary explaining the core focus of the raised concern.</p>
 									<span className="p-float-label">
-										<h3>2. Subject of the Service Request</h3>
-
 										<InputTextarea
 											autoResize
-											value={Subject}
+											value={Subject || ""}
 											onChange={(e) => setSubject(e.target.value)}
 											rows={2}
-											cols={80}
+											className="w-full"
+											placeholder="Describe the subject of concern..."
 										/>
 									</span>
 								</div>
 							</Col>
 						</Row>
-					</Container>
 
-					<Divider />
-
-					<Container>
 						<Row>
+							{/* Step 3: Description */}
 							<Col sm={12}>
-								<div className="card flex justify-content-left">
+								<div className="premium-card">
+									<div className="flex align-items-center gap-2 mb-3">
+										<Badge value="3" severity="info" style={{ borderRadius: "50%", width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }} />
+										<h3 style={{ margin: 0, fontWeight: 700 }}>Detailed Description</h3>
+									</div>
+									<p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "16px" }}>Kindly describe the issue in full detail. Mention steps to reproduce, hardware/software specifications, or constraints.</p>
 									<span className="p-float-label">
-										<h3>3. Briefly Describe your Service Request</h3>
-
 										<InputTextarea
 											autoResize
-											value={Brief}
+											value={Brief || ""}
 											onChange={(e) => setBrief(e.target.value)}
 											rows={5}
-											cols={200}
+											className="w-full"
+											placeholder="Describe your issue details here..."
 										/>
 									</span>
 								</div>
 							</Col>
 						</Row>
-					</Container>
 
-					<Divider />
-
-					<Container>
 						<Row>
+							{/* Step 4: File Upload */}
 							<Col sm={12}>
-								<div className="card flex justify-content-center">
-									<span className="p-float-label" style={{ width: "100%" }}>
-										<h3>4. Upload Supporting Files</h3>
-
-										<FileUpload
-											chooseLabel={"Select Files"}
-											uploadLabel={"Upload to Server"}
-											cancelLabel={"Clear All"}
-											previewWidth={300}
-											disabled={!upload_allow}
-											name="demo[]"
-											onUpload={file_name}
-											url="http://10.3.230.62:5050/upload"
-											accept="pdf/*"
-											maxFileSize={10000000}
-											multiple
-											emptyTemplate={
-												<p className="m-0">
-													Drag and drop relevant files supporting the issue.
-												</p>
-											}
-										/>
-									</span>
+								<div className="premium-card">
+									<div className="flex align-items-center gap-2 mb-3">
+										<Badge value="4" severity="info" style={{ borderRadius: "50%", width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }} />
+										<h3 style={{ margin: 0, fontWeight: 700 }}>Supporting Attachments</h3>
+									</div>
+									<p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "16px" }}>Upload any supporting documents, screenshots, or logs (PDF format, max 10MB). Fill in the steps above to enable uploading.</p>
+									<FileUpload
+										chooseLabel="Select PDF Files"
+										uploadLabel="Upload Files"
+										cancelLabel="Clear"
+										previewWidth={120}
+										disabled={!upload_allow}
+										name="demo[]"
+										onUpload={file_name}
+										url="http://10.3.230.62:5050/upload"
+										accept="application/pdf"
+										maxFileSize={10000000}
+										multiple
+										emptyTemplate={
+											<div className="flex flex-column align-items-center justify-content-center py-4" style={{ color: "var(--text-muted)" }}>
+												<i className="pi pi-file-pdf mb-2" style={{ fontSize: "2.5rem" }}></i>
+												<span className="text-center" style={{ fontSize: "0.85rem" }}>Drag and drop PDF files here to support your ticket.</span>
+											</div>
+										}
+									/>
 								</div>
 							</Col>
 						</Row>
 					</Container>
 
-					<br />
-					<br />
-
-					<div className="card flex justify-content-center">
-						<Checkbox
-							onChange={(e) => setChecked(e.checked)}
-							checked={checked}
-						></Checkbox>
-					</div>
-					<br />
-					<div className="card flex justify-content-center">
-						<h3>I've Filled all Data Correctly and wish to Submit</h3>
-					</div>
-					<br />
-					<div className="card flex justify-content-center">
-						<Toast ref={toast} />
-						<div className="flex flex-wrap gap-2">
-							<Button
-								disabled={!checked}
-								label="Submit Data"
-								className="p-button-success"
-								onClick={submit_data}
+					{/* Submission Card */}
+					<div className="premium-card text-center" style={{ padding: "40px 24px", marginTop: "16px", background: "linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%)" }}>
+						<div className="flex justify-content-center align-items-center gap-3 mb-3">
+							<Checkbox
+								onChange={(e) => setChecked(e.checked)}
+								checked={checked}
+								style={{ transform: "scale(1.2)" }}
 							/>
+							<span style={{ fontSize: "0.95rem", fontWeight: "600", color: "var(--text-main)", userSelect: "none", cursor: "pointer" }} onClick={() => setChecked(!checked)}>
+								I declare that all the information provided is correct and complete
+							</span>
 						</div>
+						<p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "24px" }}>Please verify all input sections are complete. The Submit button is enabled once checked.</p>
+						<Button
+							disabled={!checked}
+							label="Submit Ticket"
+							icon="pi pi-send"
+							className="p-button-success"
+							style={{ padding: "12px 40px", fontSize: "1rem" }}
+							onClick={submit_data}
+						/>
 					</div>
-				</Fieldset>
+				</div>
 			)}
+
+			<Toast ref={toast} />
 		</>
 	);
 }
+
 export default Input;
