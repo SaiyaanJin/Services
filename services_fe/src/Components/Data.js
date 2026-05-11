@@ -33,6 +33,7 @@ function Data(params) {
 	const toast = useRef();
 	const [Confirm_box_visible, setConfirm_box_visible] = useState(false);
 	const [page_hide, setpage_hide] = useState(true);
+	const [authLoading, setAuthLoading] = useState(true);
 	params.var3(page_hide);
 	const [User_id, setUser_id] = useState();
 	const [Selected_department, setSelected_department] = useState();
@@ -81,11 +82,11 @@ function Data(params) {
 					headers: { Token: id },
 				})
 				.then((response) => {
-					if (response.data === "User has logout") {
+					if (response.data === "User has logout") { setAuthLoading(false);
 						alert("User Logged-out, Please login via SSO again");
 						window.location = "https://sso.erldc.in:3000";
 						setpage_hide(true);
-					} else if (response.data === "Bad Token'") {
+					} else if (response.data === "Bad Token'") { setAuthLoading(false);
 						alert("Unauthorised Access, Please login via SSO again");
 						window.location = "https://sso.erldc.in:3000";
 						setpage_hide(true);
@@ -100,11 +101,11 @@ function Data(params) {
 								.then((response) => {
 									window.location = "https://sso.erldc.in:3000";
 								})
-								.catch((error) => {});
+								.catch((error) => {}).finally(() => setAuthLoading(false));
 						} else {
 							setUser_id(decoded["User"]);
 							setpage_hide(!decoded["Login"]);
-							setPerson_Name(decoded["Person_Name"]);
+							setPerson_Name(decoded["Person_Name"]); setAuthLoading(false);
 
 							if (
 								(decoded["User"] === "00162" &&
@@ -165,9 +166,10 @@ function Data(params) {
 						}
 					}
 				})
-				.catch((error) => {});
+				.catch((error) => { setAuthLoading(false); });
 		} else {
 			setpage_hide(true);
+			setAuthLoading(false);
 		}
 
 		if (Original_Api_data_copy) {
@@ -939,8 +941,18 @@ function Data(params) {
 
 	return (
 		<>
+			{/* Custom Styled SSO Loading Indicator */}
+			{authLoading && (
+				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+					<div className="text-center">
+						<i className="pi pi-spin pi-spinner" style={{ fontSize: "3rem", color: "var(--primary-color)" }}></i>
+						<p style={{ marginTop: "16px", color: "var(--text-muted)", fontFamily: "var(--font-heading)", fontWeight: "500" }}>Securing your session...</p>
+					</div>
+				</div>
+			)}
+
 			{/* Unauthorized Access Page */}
-			{page_hide && (
+			{!authLoading && page_hide && (
 				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
 					<div className="premium-card text-center" style={{ maxWidth: "480px", padding: "40px" }}>
 						<Avatar icon="pi pi-lock" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(244, 63, 94, 0.1)", color: "var(--danger-color)", width: "80px", height: "80px", fontSize: "36px", margin: "0 auto 24px auto" }} />
@@ -969,7 +981,7 @@ function Data(params) {
 				reject={reject}
 			/>
 
-			{!page_hide && (
+			{!authLoading && !page_hide && (
 				<div style={{ padding: "16px 2.2% 40px 2.2%" }}>
 					{/* Header section */}
 					<div className="flex align-items-center gap-3 mb-4" style={{ paddingLeft: "8px" }}>

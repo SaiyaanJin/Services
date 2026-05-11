@@ -38,6 +38,7 @@ function Input(params) {
 	const [visible2, setVisible2] = useState(false);
 	const [success_insert, setsuccess_insert] = useState(false);
 	const [Docket_No, setDocket_No] = useState();
+	const [authLoading, setAuthLoading] = useState(true);
 
 	const [Selected_department_dropdown, setSelected_department_dropdown] =
 		useState();
@@ -107,10 +108,12 @@ function Input(params) {
 						alert("User Logged-out, Please login via SSO again");
 						window.location = "https://sso.erldc.in:3000";
 						setpage_hide(true);
+						setAuthLoading(false);
 					} else if (response.data === "Bad Token") {
 						alert("Unauthorised Access, Please login via SSO again");
 						window.location = "https://sso.erldc.in:3000";
 						setpage_hide(true);
+						setAuthLoading(false);
 					} else {
 						var decoded = jwtDecode(response.data["Final_Token"], "it@posoco");
 
@@ -124,7 +127,8 @@ function Input(params) {
 								.then((response) => {
 									window.location = "https://sso.erldc.in:3000";
 								})
-								.catch((error) => {});
+								.catch((error) => {})
+								.finally(() => setAuthLoading(false));
 						} else {
 							setUser_id(decoded["User"]);
 							setpage_hide(!decoded["Login"]);
@@ -176,13 +180,18 @@ function Input(params) {
 							if (decoded["Department"] === "CR") {
 								setUser_Department("Control Room");
 							}
+							setAuthLoading(false);
 						}
 					}
 				})
-				.catch((error) => {});
+				.catch((error) => {
+					setpage_hide(true);
+					setAuthLoading(false);
+				});
 		} else {
 			setpage_hide(true);
 			params.var2("Invalid_Token");
+			setAuthLoading(false);
 		}
 
 		if (checked) {
@@ -442,8 +451,18 @@ function Input(params) {
 				</Dialog>
 			)}
 
+			{/* Custom Styled SSO Loading Indicator */}
+			{authLoading && (
+				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+					<div className="text-center">
+						<i className="pi pi-spin pi-spinner" style={{ fontSize: "3rem", color: "var(--primary-color)" }}></i>
+						<p style={{ marginTop: "16px", color: "var(--text-muted)", fontFamily: "var(--font-heading)", fontWeight: "500" }}>Securing your session...</p>
+					</div>
+				</div>
+			)}
+
 			{/* Unauthorized Access Page */}
-			{page_hide && (
+			{!authLoading && page_hide && (
 				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
 					<div className="premium-card text-center" style={{ maxWidth: "480px", padding: "40px" }}>
 						<Avatar icon="pi pi-lock" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(244, 63, 94, 0.1)", color: "var(--danger-color)", width: "80px", height: "80px", fontSize: "36px", margin: "0 auto 24px auto" }} />
@@ -462,7 +481,7 @@ function Input(params) {
 			)}
 
 			{/* Form Layout */}
-			{!page_hide && (
+			{!authLoading && !page_hide && (
 				<div style={{ padding: "16px 2.2% 40px 2.2%" }}>
 					<div className="flex align-items-center gap-3 mb-4" style={{ paddingLeft: "8px" }}>
 						<Avatar icon="pi pi-plus" style={{ backgroundColor: "rgba(79, 70, 229, 0.1)", color: "var(--primary-color)" }} shape="circle" />

@@ -58,6 +58,7 @@ function Department(params) {
 	const [isAdmin, setIsAdmin] = useState(false);
 	const [adminChecked, setAdminChecked] = useState(false);
 	const [globalFilter, setGlobalFilter] = useState("");
+	const [authLoading, setAuthLoading] = useState(true);
 
 	params.var5(pageHide);
 
@@ -86,6 +87,7 @@ function Department(params) {
 	useEffect(() => {
 		if (!id) {
 			setPageHide(true);
+			setAuthLoading(false);
 			return;
 		}
 		setLoading(true);
@@ -99,6 +101,7 @@ function Department(params) {
 					alert("Session expired or unauthorized. Please login via SSO again.");
 					window.location = "https://sso.erldc.in:3000";
 					setPageHide(true);
+					setAuthLoading(false);
 				} else {
 					const decoded = jwtDecode(response.data["Final_Token"], "it@posoco");
 					if (decoded["Login"] && decoded["Reason"] === "Session Expired") {
@@ -107,7 +110,8 @@ function Department(params) {
 							.post("https://sso.erldc.in:5000/logout", {
 								headers: { token: id },
 							})
-							.finally(() => (window.location = "https://sso.erldc.in:3000"));
+							.finally(() => (window.location = "https://sso.erldc.in:3000"))
+							.finally(() => setAuthLoading(false));
 					} else {
 						setUserId(decoded["User"]);
 						setPageHide(!decoded["Login"]);
@@ -121,12 +125,14 @@ function Department(params) {
 							departmentMap[decoded["Department"]] || decoded["Department"]
 						);
 						setLoading(false);
+						setAuthLoading(false);
 					}
 				}
 			})
 			.catch(() => {
 				setLoading(false);
 				setPageHide(true);
+				setAuthLoading(false);
 				toast.current.show({
 					severity: "error",
 					summary: "Error",
@@ -599,8 +605,18 @@ function Department(params) {
 		<>
 			<Toast ref={toast} />
 
+			{/* Custom Styled SSO Loading Indicator */}
+			{authLoading && (
+				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+					<div className="text-center">
+						<i className="pi pi-spin pi-spinner" style={{ fontSize: "3rem", color: "var(--primary-color)" }}></i>
+						<p style={{ marginTop: "16px", color: "var(--text-muted)", fontFamily: "var(--font-heading)", fontWeight: "500" }}>Securing your session...</p>
+					</div>
+				</div>
+			)}
+
 			{/* Session Expired / Unauthorized Access Page */}
-			{pageHide && (
+			{!authLoading && pageHide && (
 				<div className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
 					<div className="premium-card text-center" style={{ maxWidth: "480px", padding: "40px" }}>
 						<Avatar icon="pi pi-lock" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(244, 63, 94, 0.1)", color: "var(--danger-color)", width: "80px", height: "80px", fontSize: "36px", margin: "0 auto 24px auto" }} />
@@ -628,7 +644,7 @@ function Department(params) {
 				reject={reject}
 			/>
 
-			{!pageHide && (
+			{!authLoading && !pageHide && (
 				<div style={{ padding: "16px 2.2% 40px 2.2%" }}>
 					{/* Header section */}
 					<div className="flex align-items-center gap-3 mb-4" style={{ paddingLeft: "8px" }}>

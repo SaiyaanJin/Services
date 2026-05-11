@@ -30,6 +30,7 @@ function Dashboard(params) {
 	const [emp_data, setemp_data] = useState([]);
 	const [isAdmin, setisAdmin] = useState(false);
 	const [AdminChecked, setAdminChecked] = useState(false);
+	const [authLoading, setAuthLoading] = useState(true);
 
 	const [globalFilterValue, setGlobalFilterValue] = useState("");
 
@@ -97,10 +98,12 @@ function Dashboard(params) {
 						alert("User Logged-out, Please login via SSO again");
 						window.location = "https://sso.erldc.in";
 						setpage_hide(true);
+						setAuthLoading(false);
 					} else if (response.data === "Bad Token") {
 						alert("Unauthorised Access, Please login via SSO again");
 						window.location = "https://sso.erldc.in";
 						setpage_hide(true);
+						setAuthLoading(false);
 					} else {
 						var decoded = jwtDecode(response.data["Final_Token"], "it@posoco");
 
@@ -114,7 +117,8 @@ function Dashboard(params) {
 								.then((response) => {
 									window.location = "https://sso.erldc.in";
 								})
-								.catch((error) => {});
+								.catch((error) => {})
+								.finally(() => setAuthLoading(false));
 							window.location = "https://sso.erldc.in";
 						} else {
 							setUser_id(decoded["User"]);
@@ -176,13 +180,18 @@ function Dashboard(params) {
 							} else {
 								setisAdmin(false);
 							}
+							setAuthLoading(false);
 						}
 					}
 				})
-				.catch((error) => {});
+				.catch((error) => {
+					setpage_hide(true);
+					setAuthLoading(false);
+				});
 		} else {
 			setpage_hide(true);
 			params.var2("Invalid_Token");
+			setAuthLoading(false);
 		}
 		if (Person_Name && User_id && count) {
 			// showInfo(Person_Name + " (" + User_id + ")");
@@ -220,8 +229,16 @@ function Dashboard(params) {
 
 	return (
 		<>
+			{/* Custom Styled SSO Loading Indicator */}
+			<div hidden={!authLoading} className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+				<div className="text-center">
+					<i className="pi pi-spin pi-spinner" style={{ fontSize: "3rem", color: "var(--primary-color)" }}></i>
+					<p style={{ marginTop: "16px", color: "var(--text-muted)", fontFamily: "var(--font-heading)", fontWeight: "500" }}>Securing your session...</p>
+				</div>
+			</div>
+
 			{/* Custom Styled SSO Login Prompt */}
-			<div hidden={!page_hide} className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
+			<div hidden={authLoading || !page_hide} className="flex justify-content-center align-items-center" style={{ minHeight: "60vh" }}>
 				<div className="premium-card text-center" style={{ maxWidth: "480px", padding: "40px" }}>
 					<Avatar icon="pi pi-lock" size="xlarge" shape="circle" style={{ backgroundColor: "rgba(244, 63, 94, 0.1)", color: "var(--danger-color)", width: "80px", height: "80px", fontSize: "36px", margin: "0 auto 24px auto" }} />
 					<h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "12px", color: "var(--text-main)" }}>Authentication Required</h2>
@@ -237,7 +254,7 @@ function Dashboard(params) {
 				</div>
 			</div>
 
-			<div hidden={page_hide} style={{ padding: "16px 2.2% 40px 2.2%" }}>
+			<div hidden={authLoading || page_hide} style={{ padding: "16px 2.2% 40px 2.2%" }}>
 				{/* Welcome Hero Area */}
 				<div className="premium-card welcome-hero" style={{
 					background: "linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%)",
