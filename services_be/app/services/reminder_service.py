@@ -38,7 +38,7 @@ def get_first_action_date(action_batch):
         return action_batch.get("Date")
     return None
 
-def send_reminder_email(ticket: dict, days_elapsed: int, background_tasks=None):
+def send_reminder_email(ticket: dict, days_elapsed: int, background_tasks=None, cc_email=None):
     """Sends a reminder email to the concerned department of the ticket."""
     dept_name = ticket.get("Department")
     docket_no = ticket.get("Docket_Number")
@@ -50,7 +50,9 @@ def send_reminder_email(ticket: dict, days_elapsed: int, background_tasks=None):
         return False
 
     to_recipients = email_info["to"]
-    cc_recipients = email_info["cc"]
+    cc_recipients = list(email_info["cc"]) if email_info.get("cc") else []
+    if cc_email and "@" in cc_email:
+        cc_recipients.append(cc_email)
     
     raised_by = ticket.get("Data_Filled_by") or "Unknown"
     input_date = ticket.get("Input_Date") or "Unknown"

@@ -50,3 +50,32 @@ export const getDepartmentBackendName = (ssoDept) => {
 	
 	return ssoDepartmentToBackendName[key] || ssoDept;
 };
+
+export const getCompleteDepartmentName = (dept) => {
+	if (!dept) return "";
+	const d = dept.trim();
+	if (d.includes("Logistics : IT") || d.includes("Logistics: IT")) {
+		return "Logistics- IT Services";
+	}
+	if (d.includes("Logistics : TS") || d.includes("Logistics: TS")) {
+		return "Logistics- Technical Services";
+	}
+	if (d.includes("Logistics : Communication") || d.includes("Logistics: Communication")) {
+		return "Logistics- Communication";
+	}
+	if (d.includes("Logistics : OT") || d.includes("Logistics: OT")) {
+		return "Logistics- OT (Decision Support)";
+	}
+	
+	if (d.includes(":")) {
+		const parts = d.split(":").map(p => p.trim());
+		if (parts[0].toLowerCase() === parts[1].toLowerCase()) {
+			return parts[0];
+		}
+		if (parts[1].toLowerCase().startsWith(parts[0].toLowerCase())) {
+			return parts[1];
+		}
+		return `${parts[0]}- ${parts[1]}`;
+	}
+	return d;
+};

@@ -35,7 +35,7 @@ def cleanup_file(path: str):
 
 @router.post("/upload")
 def upload_files(
-    demo: list[UploadFile] = File(...),
+    demo: list[UploadFile] = File(..., alias="demo[]"),
     current_user: dict = Depends(get_current_user)
 ):
     """

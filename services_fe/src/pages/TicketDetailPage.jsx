@@ -7,7 +7,7 @@ import { useTickets } from "../hooks/useTickets";
 import { TicketDetailSkeleton } from "../components/common/SkeletonLoader";
 import moment from "moment";
 import apiClient, { API_BASE_URL } from "../api";
-import { getDepartmentBackendName } from "../utils/departmentMap";
+import { getDepartmentBackendName, getCompleteDepartmentName } from "../utils/departmentMap";
 import { getStatusColors } from "../utils/ticketHelpers";
 
 
@@ -385,6 +385,35 @@ const TicketDetailPage = () => {
 		if (user) loadTicketDetails();
 	}, [user, loadTicketDetails]);
 
+	const isReminderDisabled = () => {
+		if (!ticket) return true;
+		
+		const now = moment();
+		const inputDate = moment(ticket.Input_Date, [
+			"DD-MM-YYYY hh:mm a",
+			"DD-MM-YYYY hh:mma",
+			"DD-MM-YYYY HH:mm",
+			"DD-MM-YYYY HH:mm:ss"
+		]);
+		
+		if (!inputDate.isValid()) return false;
+		
+		// 1. Created today
+		if (inputDate.isSame(now, 'day')) {
+			return true;
+		}
+		
+		// 2. Already sent today
+		if (ticket.Last_Manual_Reminder_Date) {
+			const lastSent = moment(ticket.Last_Manual_Reminder_Date, "DD-MM-YYYY");
+			if (lastSent.isValid() && lastSent.isSame(now, 'day')) {
+				return true;
+			}
+		}
+		
+		return false;
+	};
+
 	const sendReminderMail = async () => {
 		if (!ticket || !ticket.Docket_Number) return;
 		setSendingReminder(true);
@@ -399,6 +428,10 @@ const TicketDetailPage = () => {
 					detail: `Reminder email successfully sent to ${ticket.Department} department!`,
 					life: 4000
 				});
+				
+				// Update local state so button gets disabled immediately
+				const todayStr = moment().format("DD-MM-YYYY");
+				setTicket(prev => prev ? { ...prev, Last_Manual_Reminder_Date: todayStr } : null);
 			} else {
 				throw new Error("Failed to send reminder");
 			}
@@ -407,7 +440,7 @@ const TicketDetailPage = () => {
 			toast.current?.show({
 				severity: "error",
 				summary: "Error",
-				detail: "Failed to send reminder email. Please try again later.",
+				detail: err.response?.data?.detail || "Failed to send reminder email. Please try again later.",
 				life: 4000
 			});
 		} finally {
@@ -814,43 +847,65 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 											<p className="m-0 text-700 text-sm line-height-3 white-space-pre-wrap w-full">
 												{ticket.Breif || ticket.description || "No description provided."}
 											</p>
-											{ticket.Present_Status !== "Resolved" && ticket.Present_Status !== "Closed" && !ticket.Ticket_Closed && (
-												<button
-													className="flex align-items-center gap-2 mt-1"
-													onClick={sendReminderMail}
-													disabled={sendingReminder}
-													style={{ 
-														padding: '8px 18px', 
-														fontSize: '0.8rem', 
-														border: 'none',
-														color: '#ffffff',
-														background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
-														borderRadius: '20px',
-														fontWeight: '700',
-														cursor: 'pointer',
-														transition: 'all 0.3s ease',
-														boxShadow: '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)',
-														letterSpacing: '0.3px'
-													}}
-													onMouseEnter={(e) => {
-														e.currentTarget.style.background = 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)';
-														e.currentTarget.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.85), 0 6px 8px rgba(239, 68, 68, 0.25)';
-														e.currentTarget.style.transform = 'translateY(-1px)';
-													}}
-													onMouseLeave={(e) => {
-														e.currentTarget.style.background = 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
-														e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)';
-														e.currentTarget.style.transform = 'translateY(0)';
-													}}
-												>
-													{sendingReminder ? (
-														<i className="pi pi-spin pi-spinner" style={{ fontSize: '0.8rem' }} />
-													) : (
-														<i className="pi pi-bell" style={{ fontSize: '0.8rem' }} />
-													)}
-													<span>Send Reminder to Department</span>
-												</button>
-											)}
+											{ticket.Present_Status !== "Resolved" && ticket.Present_Status !== "Closed" && !ticket.Ticket_Closed && (() => {
+												const reminderDisabled = isReminderDisabled();
+												const now = moment();
+												return (
+													<div className="flex flex-column gap-1.5 align-items-start mt-1">
+														<button
+															className="flex align-items-center gap-2"
+															onClick={sendReminderMail}
+															disabled={sendingReminder || reminderDisabled}
+															style={{ 
+																padding: '8px 18px', 
+																fontSize: '0.8rem', 
+																border: 'none',
+																color: '#ffffff',
+																background: reminderDisabled 
+																	? '#cbd5e1' 
+																	: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+																borderRadius: '20px',
+																fontWeight: '700',
+																cursor: reminderDisabled ? 'not-allowed' : 'pointer',
+																transition: 'all 0.3s ease',
+																boxShadow: reminderDisabled 
+																	? 'none' 
+																	: '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)',
+																letterSpacing: '0.3px',
+																opacity: reminderDisabled ? 0.8 : 1
+															}}
+															onMouseEnter={(e) => {
+																if (!reminderDisabled) {
+																	e.currentTarget.style.background = 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)';
+																	e.currentTarget.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.85), 0 6px 8px rgba(239, 68, 68, 0.25)';
+																	e.currentTarget.style.transform = 'translateY(-1px)';
+																}
+															}}
+															onMouseLeave={(e) => {
+																if (!reminderDisabled) {
+																	e.currentTarget.style.background = 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
+																	e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)';
+																	e.currentTarget.style.transform = 'translateY(0)';
+																}
+															}}
+														>
+															{sendingReminder ? (
+																<i className="pi pi-spin pi-spinner" style={{ fontSize: '0.8rem' }} />
+															) : (
+																<i className="pi pi-bell" style={{ fontSize: '0.8rem' }} />
+															)}
+															<span>Send Reminder to Department</span>
+														</button>
+														{reminderDisabled && (
+															<span className="text-xs text-500 font-medium ml-1" style={{ color: '#ef4444' }}>
+																{moment(ticket.Input_Date, ["DD-MM-YYYY hh:mm a", "DD-MM-YYYY hh:mma", "DD-MM-YYYY HH:mm", "DD-MM-YYYY HH:mm:ss"]).isSame(now, 'day')
+																	? "⚠ Reminders can only be sent starting tomorrow."
+																	: "⚠ Only one reminder can be sent per day."}
+															</span>
+														)}
+													</div>
+												);
+											})()}
 										</div>
 									)}
 								</div>
@@ -1029,7 +1084,7 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 									<div className="flex justify-content-between align-items-center">
 										<span className="text-sm font-semibold text-500">Target Department</span>
 										<span className="text-sm font-bold" style={{ color: theme.primaryColor }}>
-											{ticket.Department?.split(":")[0].trim()}
+											{getCompleteDepartmentName(ticket.Department)}
 										</span>
 									</div>
 									<div className="border-top-1 border-50" />

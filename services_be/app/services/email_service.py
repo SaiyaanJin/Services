@@ -119,7 +119,7 @@ class EmailService:
             logger.error(f"Failed to send email '{subject}': {e}")
             return False
 
-    def send_new_ticket_email(self, ticket: dict, background_tasks: BackgroundTasks):
+    def send_new_ticket_email(self, ticket: dict, background_tasks: BackgroundTasks, cc_email: str = None):
         """Asynchronously send email notification to target department about a new ticket"""
         dept_name = ticket.get("Department")
         docket_no = ticket.get("Docket_Number")
@@ -129,9 +129,11 @@ class EmailService:
         if not email_info:
             logger.warning(f"No email configuration found for department: {dept_name}. Skipping email.")
             return
-
+ 
         to_recipients = email_info["to"]
-        cc_recipients = email_info["cc"]
+        cc_recipients = list(email_info["cc"]) if email_info.get("cc") else []
+        if cc_email and "@" in cc_email:
+            cc_recipients.append(cc_email)
 
         html_body = f"""
         <html>
@@ -190,7 +192,7 @@ class EmailService:
             cc_recipients=cc_recipients
         )
 
-    def send_status_update_email(self, ticket: dict, status_choice: str, edited_by: str, issuer_email: str, background_tasks: BackgroundTasks):
+    def send_status_update_email(self, ticket: dict, status_choice: str, edited_by: str, issuer_email: str, background_tasks: BackgroundTasks, cc_email: str = None):
         """Asynchronously notify the ticket creator about changes to the ticket status"""
         if not issuer_email:
             logger.warning(f"No issuer email provided for ticket {ticket.get('Docket_Number')}. Skipping notification email.")
@@ -198,6 +200,10 @@ class EmailService:
 
         docket_no = ticket.get("Docket_Number")
         subject = f"Service Request Updated: {ticket.get('Subject')} (Docket No- {docket_no}) is marked {status_choice}"
+
+        cc_recipients = []
+        if cc_email and "@" in cc_email:
+            cc_recipients.append(cc_email)
 
         html_body = f"""
         <html>
@@ -249,7 +255,8 @@ class EmailService:
             self._send_exchange_mail,
             subject=subject,
             html_body=html_body,
-            to_recipients=[issuer_email]
+            to_recipients=[issuer_email],
+            cc_recipients=cc_recipients
         )
 
 email_service = EmailService()

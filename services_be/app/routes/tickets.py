@@ -89,7 +89,7 @@ def insert_ticket(request: Request, background_tasks: BackgroundTasks, current_u
         logger.info(f"Ticket Docket No {docket_num} successfully created by {user_string}")
         
         # Trigger asynchronous email notification to department in the background
-        email_service.send_new_ticket_email(payload, background_tasks)
+        email_service.send_new_ticket_email(payload, background_tasks, cc_email=current_user.get("email"))
         
         return ["Data Inserted SuccessFully", docket_num]
     except Exception as e:
@@ -319,7 +319,8 @@ def update_ticket_status(request: Request, background_tasks: BackgroundTasks, cu
                 new_status,
                 editor_display,
                 creator_email,
-                background_tasks
+                background_tasks,
+                cc_email=current_user.get("email")
             )
         else:
             logger.warning(f"Could not resolve creator email for user {creator_string}. Skip status email.")
@@ -364,11 +365,31 @@ async def send_ticket_reminder(request: Request, background_tasks: BackgroundTas
     if not input_date:
         raise HTTPException(status_code=400, detail="Ticket has invalid creation date format")
 
-    days_elapsed = (datetime.now() - input_date).days
+    now = datetime.now()
     
-    success = send_reminder_email(ticket, days_elapsed, background_tasks)
+    # 1. Check if created today
+    if input_date.date() == now.date():
+        raise HTTPException(status_code=400, detail="Reminders can only be sent starting tomorrow.")
+
+    # 2. Check if reminder already sent today
+    today_str = now.strftime("%d-%m-%Y")
+    if ticket.get("Last_Manual_Reminder_Date") == today_str:
+        raise HTTPException(status_code=400, detail="Only one reminder can be sent per day.")
+
+    days_elapsed = (now - input_date).days
+    
+    success = send_reminder_email(ticket, days_elapsed, background_tasks, cc_email=current_user.get("email"))
     if not success:
          raise HTTPException(status_code=500, detail="Failed to send email")
+
+    # Update database
+    db.tickets_collection.update_one(
+        {"Docket_Number": docket_no},
+        {"$set": {
+            "Last_Manual_Reminder_Date": today_str,
+            "Last_Reminder_Date": now.strftime("%d-%m-%Y %I:%M %p")
+        }}
+    )
 
     return "Success"
 
@@ -404,7 +425,7 @@ async def send_bulk_reminder(request: Request, background_tasks: BackgroundTasks
         days_elapsed = (datetime.now() - input_date).days
         
         # Send reminder
-        success = send_reminder_email(ticket, days_elapsed, background_tasks)
+        success = send_reminder_email(ticket, days_elapsed, background_tasks, cc_email=current_user.get("email"))
         if success:
             sent_count += 1
 
