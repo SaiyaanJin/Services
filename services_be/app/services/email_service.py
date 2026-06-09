@@ -46,7 +46,7 @@ DEPARTMENT_EMAIL_MAPPING = {
     },
     "Market Operation : Interface Energy Metering, Accounting & Settlement": {
         "to": ["erldc.mo@grid-india.in"],
-        "cc": ]
+        "cc": []
     },
     "Market Operation : Regulatory Affairs, Market Operation planning & Coordination": {
         "to": ["erldc.mo@grid-india.in"],
@@ -172,7 +172,7 @@ class EmailService:
                         </table>
                         
                         <div style="text-align: center; margin: 24px 0;">
-                            <a href="https://sso.erldc.in/" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block;">View Ticket in Portal</a>
+                            <a href="{settings.FRONTEND_BASE_URL}/ticket/{docket_no}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block;">View Ticket in Portal</a>
                         </div>
                         
                         <p style="font-size: 12px; color: #64748b; margin-bottom: 0;">This is an automated, system-generated email. Please do not reply directly to this mail.</p>
@@ -235,7 +235,7 @@ class EmailService:
                         </div>
                         
                         <div style="text-align: center; margin: 24px 0;">
-                            <a href="https://sso.erldc.in/" style="background-color: #10b981; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block;">Log in to Service Request Portal</a>
+                            <a href="{settings.FRONTEND_BASE_URL}/ticket/{docket_no}" style="background-color: #10b981; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block;">View Ticket in Portal</a>
                         </div>
                         
                         <p style="font-size: 12px; color: #64748b; margin-bottom: 0;">This is an automated, system-generated email. Please do not reply directly to this mail.</p>

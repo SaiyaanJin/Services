@@ -39,6 +39,13 @@ export const AuthProvider = ({ children }) => {
 			if (!activeToken) {
 				setAuthLoading(false);
 				setIsAuthenticated(false);
+				// If the user arrived on a deep-link path (e.g., /ticket/42 from an email),
+				// save the intended path and redirect to SSO for authentication
+				const currentPath = window.location.pathname;
+				if (currentPath && currentPath !== "/") {
+					localStorage.setItem("sso_redirect_path", currentPath);
+					window.location.href = "https://sso.erldc.in";
+				}
 				return;
 			}
 
@@ -86,6 +93,19 @@ export const AuthProvider = ({ children }) => {
 						decoded["User"] === "60004"
 					) ? "admin" : "user",
 				});
+
+				// Clean the URL: remove ?token= from the address bar while preserving the path.
+				// This ensures React Router sees the correct route (e.g., /ticket/42)
+				if (urlToken) {
+					// Check if there's a saved deep-link path from a previous SSO redirect
+					const savedPath = localStorage.getItem("sso_redirect_path");
+					if (savedPath) {
+						localStorage.removeItem("sso_redirect_path");
+						window.history.replaceState({}, "", savedPath);
+					} else {
+						window.history.replaceState({}, "", window.location.pathname);
+					}
+				}
 
 			} catch (err) {
 				console.error("Authentication check failed:", err);

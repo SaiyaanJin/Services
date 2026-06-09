@@ -25,6 +25,9 @@ class Settings:
     SSO_API_KEY: str = os.getenv("SSO_API_KEY", "")
     SSO_JWT_SECRET: str = os.getenv("SSO_JWT_SECRET", "it@posoco")
 
+    # Frontend URL (for generating deep-links in email notifications)
+    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://10.3.230.62:3001")
+
     # File Settings
     UPLOAD_BASE_PATH: str = os.getenv("UPLOAD_BASE_PATH", "E:/Applications/Services/services_be/instance/htmlfi/")
     ZIP_TEMP_PATH: str = os.getenv("ZIP_TEMP_PATH", "E:/Applications/Services/services_be/instance/ZipFiles/")
