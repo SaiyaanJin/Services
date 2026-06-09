@@ -328,3 +328,84 @@ def update_ticket_status(request: Request, background_tasks: BackgroundTasks, cu
     except Exception as e:
         logger.error(f"Failed to update ticket status: {e}")
         return "Error"
+
+@router.api_route("/SendTicketReminder", methods=["GET", "POST"])
+async def send_ticket_reminder(request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+    """
+    Sends a manual reminder email to the concerned department of a ticket.
+    """
+    docket_param = parse_request_payload(request)
+    if not docket_param:
+        try:
+            body = await request.json()
+            docket_param = body.get("Docket_Number") or body.get("docket_number")
+        except:
+            pass
+
+    if not docket_param:
+        # Fallback to query parameters
+        docket_param = request.query_params.get("Docket_Number") or request.query_params.get("docket_number")
+
+    if not docket_param:
+        raise HTTPException(status_code=400, detail="Missing Docket_Number parameter")
+
+    try:
+        docket_no = int(docket_param)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid Docket_Number format")
+
+    ticket = db.tickets_collection.find_one({"Docket_Number": docket_no, "is_deleted": {"$ne": True}})
+    if not ticket:
+        raise HTTPException(status_code=404, detail=f"Ticket Docket No {docket_no} not found")
+
+    from app.services.reminder_service import parse_date, send_reminder_email
+    
+    input_date = parse_date(ticket.get("Input_Date"))
+    if not input_date:
+        raise HTTPException(status_code=400, detail="Ticket has invalid creation date format")
+
+    days_elapsed = (datetime.now() - input_date).days
+    
+    success = send_reminder_email(ticket, days_elapsed, background_tasks)
+    if not success:
+         raise HTTPException(status_code=500, detail="Failed to send email")
+
+    return "Success"
+
+@router.api_route("/SendBulkReminder", methods=["GET", "POST"])
+async def send_bulk_reminder(request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+    """
+    Sends a reminder email to the concerned department of all tickets with status "New Service Request".
+    Only accessible by users with "admin" role.
+    """
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Only admins can send bulk reminders."
+        )
+
+    # Find all tickets with status "New Service Request"
+    tickets = list(db.tickets_collection.find({
+        "Present_Status": "New Service Request",
+        "is_deleted": {"$ne": True}
+    }))
+
+    if not tickets:
+        return {"status": "Success", "sent_count": 0}
+
+    from app.services.reminder_service import parse_date, send_reminder_email
+    
+    sent_count = 0
+    for ticket in tickets:
+        input_date = parse_date(ticket.get("Input_Date"))
+        if not input_date:
+            continue
+            
+        days_elapsed = (datetime.now() - input_date).days
+        
+        # Send reminder
+        success = send_reminder_email(ticket, days_elapsed, background_tasks)
+        if success:
+            sent_count += 1
+
+    return {"status": "Success", "sent_count": sent_count}

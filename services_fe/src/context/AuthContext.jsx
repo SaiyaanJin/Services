@@ -2,10 +2,12 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { getDepartmentDisplayName } from "../utils/departmentMap";
+import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+	const navigate = useNavigate();
 	const [user, setUser] = useState(null);
 	const [token, setTokenState] = useState(localStorage.getItem("sso_token") || "");
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -101,9 +103,9 @@ export const AuthProvider = ({ children }) => {
 					const savedPath = localStorage.getItem("sso_redirect_path");
 					if (savedPath) {
 						localStorage.removeItem("sso_redirect_path");
-						window.history.replaceState({}, "", savedPath);
+						navigate(savedPath);
 					} else {
-						window.history.replaceState({}, "", window.location.pathname);
+						navigate(window.location.pathname, { replace: true });
 					}
 				}
 
@@ -116,6 +118,7 @@ export const AuthProvider = ({ children }) => {
 		};
 
 		verifySession();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [token]);
 
 	return (

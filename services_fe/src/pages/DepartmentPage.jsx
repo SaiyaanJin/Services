@@ -11,92 +11,10 @@ import { useTickets } from "../hooks/useTickets";
 import { TableSkeleton } from "../components/common/SkeletonLoader";
 import EmptyState from "../components/common/EmptyState";
 import { getDepartmentBackendName } from "../utils/departmentMap";
+import apiClient from "../api";
 
-// Clean initials helper
-const getInitials = (name) => {
-	if (!name) return "??";
-	const cleanName = name.split("(")[0].trim();
-	const parts = cleanName.split(/\s+/);
-	if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-	return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
+import { getInitials, getAvatarColorClass, getSubjectIconInfo, getDeptIconInfo, getStatusColors } from "../utils/ticketHelpers";
 
-// Colors for Initials Avatar
-const getAvatarColorClass = (name) => {
-	if (!name) return { bg: "#f1f5f9", text: "#475569" };
-	const colors = [
-		{ bg: "#ccfbf1", text: "#0d9488" }, // Teal
-		{ bg: "#fce7f3", text: "#db2777" }, // Pink
-		{ bg: "#ffedd5", text: "#ea580c" }, // Orange
-		{ bg: "#fef9c3", text: "#ca8a04" }, // Yellow
-		{ bg: "#f3e8ff", text: "#8b5cf6" }, // Purple
-		{ bg: "#dcfce7", text: "#16a34a" }, // Green
-		{ bg: "#dbeafe", text: "#2563eb" }  // Blue
-	];
-	let hash = 0;
-	for (let i = 0; i < name.length; i++) {
-		hash = name.charCodeAt(i) + ((hash << 5) - hash);
-	}
-	const index = Math.abs(hash) % colors.length;
-	return colors[index];
-};
-
-// Subject icon mapping
-const getSubjectIconInfo = (subject) => {
-	const sub = (subject || "").toLowerCase();
-	if (sub.includes("crms") || sub.includes("call") || sub.includes("support")) {
-		return { icon: "pi pi-phone", bg: "#f3e8ff", color: "#a855f7" };
-	}
-	if (sub.includes("server") || sub.includes("database") || sub.includes("sql") || sub.includes("backup") || sub.includes("shutting")) {
-		return { icon: "pi pi-server", bg: "#ffe4e6", color: "#f43f5e" };
-	}
-	if (sub.includes("pc") || sub.includes("desktop") || sub.includes("computer") || sub.includes("monitor") || sub.includes("transfer")) {
-		return { icon: "pi pi-desktop", bg: "#e0f2fe", color: "#0284c7" };
-	}
-	if (sub.includes("acrobat") || sub.includes("pdf") || sub.includes("reader") || sub.includes("file") || sub.includes("document")) {
-		return { icon: "pi pi-file-pdf", bg: "#fee2e2", color: "#ef4444" };
-	}
-	if (sub.includes("install") || sub.includes("notepad") || sub.includes("software") || sub.includes("code") || sub.includes("program")) {
-		return { icon: "pi pi-code", bg: "#e0e7ff", color: "#4f46e5" };
-	}
-	if (sub.includes("laptop") || sub.includes("notebook") || sub.includes("hinge") || sub.includes("damage")) {
-		return { icon: "pi pi-tablet", bg: "#ccfbf1", color: "#0d9488" };
-	}
-	if (sub.includes("eoffice") || sub.includes("hrms") || sub.includes("login") || sub.includes("account") || sub.includes("user")) {
-		return { icon: "pi pi-user", bg: "#ffedd5", color: "#f97316" };
-	}
-	if (sub.includes("power") || sub.includes("battery") || sub.includes("charger") || sub.includes("electricity") || sub.includes("powering")) {
-		return { icon: "pi pi-power-off", bg: "#e0f2fe", color: "#3b82f6" };
-	}
-	return { icon: "pi pi-ticket", bg: "#f1f5f9", color: "#64748b" };
-};
-
-// Department icon mapping
-const getDeptIconInfo = (dept) => {
-	const d = (dept || "").toLowerCase();
-	if (d.includes("system operation")) {
-		return { icon: "pi pi-cog", bg: "#e0f2fe", color: "#3b82f6" };
-	}
-	if (d.includes("scada")) {
-		return { icon: "pi pi-sitemap", bg: "#f3e8ff", color: "#8b5cf6" };
-	}
-	if (d.includes("human resource")) {
-		return { icon: "pi pi-users", bg: "#ffedd5", color: "#ea580c" };
-	}
-	if (d.includes("market operation")) {
-		return { icon: "pi pi-clock", bg: "#e0f2fe", color: "#2563eb" };
-	}
-	if (d.includes("information technology") || d.includes("it")) {
-		return { icon: "pi pi-desktop", bg: "#e0f2fe", color: "#0284c7" };
-	}
-	if (d.includes("finance") || d.includes("accounts")) {
-		return { icon: "pi pi-wallet", bg: "#dcfce7", color: "#16a34a" };
-	}
-	if (d.includes("contracts") || d.includes("services")) {
-		return { icon: "pi pi-briefcase", bg: "#fef9c3", color: "#ca8a04" };
-	}
-	return { icon: "pi pi-building", bg: "#f1f5f9", color: "#64748b" };
-};
 
 const DepartmentPage = () => {
 	const { user } = useAuth();
@@ -110,6 +28,7 @@ const DepartmentPage = () => {
 	// Admin selection control
 	const [selectedQueueDept, setSelectedQueueDept] = useState("");
 	const [adminChecked, setAdminChecked] = useState(false);
+	const [sendingBulk, setSendingBulk] = useState(false);
 	
 	// Filtering states
 	const [searchQuery, setSearchQuery] = useState("");
@@ -128,7 +47,7 @@ const DepartmentPage = () => {
 	];
 
 	const defaultDeptName = user ? getDepartmentBackendName(user.sso_department) : "";
-	const activeQueueName = selectedQueueDept || defaultDeptName;
+	const activeQueueName = (user?.role === "admin" && adminChecked) ? "All Departments" : (selectedQueueDept || defaultDeptName);
 
 	// Resolve the active department to query
 	const getQueryDepartment = useCallback(() => {
@@ -140,12 +59,12 @@ const DepartmentPage = () => {
 
 	const loadDepartmentTickets = useCallback(async () => {
 		const targetDept = getQueryDepartment();
-		if (!targetDept) return;
+		if (!targetDept && !(user?.role === "admin" && adminChecked)) return;
 
 		try {
 			let data = [];
 			if (user?.role === "admin" && adminChecked) {
-				data = await fetchTickets("department_admin_view", targetDept);
+				data = await fetchTickets("admin");
 			} else {
 				data = await fetchTickets("department_admin", targetDept);
 			}
@@ -201,7 +120,8 @@ const DepartmentPage = () => {
 			const worksheet = xlsx.utils.json_to_sheet(exportData);
 			const workbook = { Sheets: { data: worksheet }, SheetNames: ["data"] };
 			const excelBuffer = xlsx.write(workbook, { bookType: "xlsx", type: "array" });
-			saveAsExcelFile(excelBuffer, `${getQueryDepartment()}_Queue`);
+			const fileName = (user?.role === "admin" && adminChecked) ? "All_Departments" : getQueryDepartment();
+			saveAsExcelFile(excelBuffer, `${fileName}_Queue`);
 		});
 	};
 
@@ -223,6 +143,34 @@ const DepartmentPage = () => {
 		{ label: "Can not be Resolved", value: "Can not be Resolved" },
 		{ label: "Working (No Action Required)", value: "Working (No Action Required)" }
 	];
+
+	const sendBulkReminders = async () => {
+		setSendingBulk(true);
+		try {
+			const response = await apiClient.get("/SendBulkReminder");
+			if (response.data && response.data.status === "Success") {
+				const count = response.data.sent_count || 0;
+				toast.current?.show({
+					severity: "success",
+					summary: "Bulk Reminders Sent",
+					detail: `Reminder emails successfully sent for ${count} new service request tickets!`,
+					life: 5000
+				});
+			} else {
+				throw new Error("API returned failure status");
+			}
+		} catch (err) {
+			console.error("Failed to send bulk reminders:", err);
+			toast.current?.show({
+				severity: "error",
+				summary: "Error",
+				detail: "Failed to send bulk reminders. Please try again later.",
+				life: 5000
+			});
+		} finally {
+			setSendingBulk(false);
+		}
+	};
 
 	// Column templates
 	const docketTemplate = (rowData) => {
@@ -309,19 +257,7 @@ const DepartmentPage = () => {
 
 	const statusTemplate = (rowData) => {
 		const status = rowData.Present_Status;
-		let styles = { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" };
-
-		if (status === "New Service Request") {
-			styles = { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6" };
-		} else if (status === "Working (No Action Required)") {
-			styles = { bg: "#f1f5f9", color: "#334155", dot: "#64748b" };
-		} else if (status === "Resolved" || status === "Closed") {
-			styles = { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e" };
-		} else if (status === "Under Progress") {
-			styles = { bg: "#fffbeb", color: "#b45309", dot: "#f59e0b" };
-		} else if (status === "Can not be Resolved") {
-			styles = { bg: "#fef2f2", color: "#b91c1c", dot: "#ef4444" };
-		}
+		const styles = getStatusColors(status);
 
 		return (
 			<div className="inline-flex align-items-center px-3 py-1.5 border-round-pill text-xs font-semibold" style={{ 
@@ -398,6 +334,44 @@ const DepartmentPage = () => {
 									style={{ transform: 'scale(0.85)' }}
 								/>
 							</div>
+							<button 
+								className="flex align-items-center gap-2"
+								onClick={sendBulkReminders}
+								disabled={sendingBulk}
+								style={{ 
+									padding: '8px 18px', 
+									fontSize: '0.8rem', 
+									border: 'none',
+									color: '#ffffff',
+									background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+									borderRadius: '20px',
+									fontWeight: '700',
+									cursor: 'pointer',
+									transition: 'all 0.3s ease',
+									height: '34px',
+									display: 'flex',
+									alignItems: 'center',
+									boxShadow: '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)',
+									letterSpacing: '0.3px'
+								}}
+								onMouseEnter={(e) => {
+									e.currentTarget.style.background = 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)';
+									e.currentTarget.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.85), 0 6px 8px rgba(239, 68, 68, 0.25)';
+									e.currentTarget.style.transform = 'translateY(-1px)';
+								}}
+								onMouseLeave={(e) => {
+									e.currentTarget.style.background = 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
+									e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)';
+									e.currentTarget.style.transform = 'translateY(0)';
+								}}
+							>
+								{sendingBulk ? (
+									<i className="pi pi-spin pi-spinner" style={{ fontSize: '0.8rem' }} />
+								) : (
+									<i className="pi pi-bell" style={{ fontSize: '0.8rem' }} />
+								)}
+								<span>Remind New Requests</span>
+							</button>
 						</>
 					)}
 					<button 

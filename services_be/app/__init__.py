@@ -39,6 +39,11 @@ def create_app() -> FastAPI:
     app.include_router(files_router, tags=["Files"])
     app.include_router(admin_router, tags=["Admin"])
 
+    @app.on_event("startup")
+    async def on_startup():
+        from app.services.reminder_service import start_reminder_scheduler
+        await start_reminder_scheduler()
+
     @app.get("/health", tags=["Health"])
     def health_check():
         """Backend health check endpoint"""

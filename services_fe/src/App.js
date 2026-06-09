@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Route, Link, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Route, Link, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ProgressSpinner } from "primereact/progressspinner";
 
 // Global Stylesheets
@@ -16,11 +16,50 @@ import TicketListPage from "./pages/TicketListPage";
 import TicketDetailPage from "./pages/TicketDetailPage";
 import NewTicketPage from "./pages/NewTicketPage";
 import DepartmentPage from "./pages/DepartmentPage";
+import { getInitials, getAvatarColorClass } from "./utils/ticketHelpers";
+
 
 // Main layout wrapper to access useAuth hook
 const AppLayout = () => {
-	const { isAuthenticated, authLoading, token, logout } = useAuth();
+	const { isAuthenticated, authLoading, token, logout, user } = useAuth();
 	const location = useLocation();
+	const navigate = useNavigate();
+
+	// Search handler synchronized with URL search parameters
+	const searchParams = new URLSearchParams(location.search);
+	const searchQuery = searchParams.get("search") || "";
+
+	const handleSearchChange = (e) => {
+		const val = e.target.value;
+		const params = new URLSearchParams(location.search);
+		if (val) {
+			params.set("search", val);
+		} else {
+			params.delete("search");
+		}
+		
+		if (location.pathname !== "/Data") {
+			navigate(`/Data?${params.toString()}`);
+		} else {
+			navigate(`/Data?${params.toString()}`, { replace: true });
+		}
+	};
+
+	// Ctrl+K keyboard shortcut to focus search input
+	React.useEffect(() => {
+		const handleKeyDown = (e) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+				e.preventDefault();
+				const searchInput = document.querySelector(".search-input");
+				if (searchInput) {
+					searchInput.focus();
+				}
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
+
 
 	if (authLoading) {
 		return (
@@ -98,16 +137,86 @@ const AppLayout = () => {
 								</li>
 							</ul>
 						</nav>
-						<div className="sidebar-profile-bottom">
-							<button className="p-button p-button-text logout-btn" onClick={logout}>
-								<i className="pi pi-sign-out" />
-								<span>Logout</span>
-							</button>
+						<div className="sidebar-profile-bottom" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+							{user && (() => {
+								const initials = getInitials(user.name);
+								const avatarColors = getAvatarColorClass(user.name);
+								return (
+									<>
+										<div 
+											className="profile-avatar" 
+											style={{
+												width: '36px',
+												height: '36px',
+												borderRadius: '50%',
+												backgroundColor: avatarColors.bg,
+												color: avatarColors.text,
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+												fontWeight: '700',
+												fontSize: '0.85rem',
+												flexShrink: 0
+											}}
+										>
+											{initials}
+										</div>
+										<div className="profile-info" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0 }}>
+											<span className="profile-name" style={{ color: '#ffffff', fontWeight: '600', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+												{user.name}
+											</span>
+											<span className="profile-dept" style={{ color: '#94a3b8', fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+												{user.department}
+											</span>
+										</div>
+										<button 
+											className="profile-chevron logout-btn" 
+											onClick={logout} 
+											title="Logout"
+											style={{
+												background: 'transparent',
+												border: 'none',
+												color: '#94a3b8',
+												cursor: 'pointer',
+												padding: '4px',
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+												transition: 'color 0.2s',
+												marginLeft: 'auto'
+											}}
+										>
+											<i className="pi pi-sign-out" style={{ fontSize: '1rem' }} />
+										</button>
+									</>
+								);
+							})()}
 						</div>
 					</aside>
 
 					{/* Main Right Content Panel */}
 					<div className="main-content">
+						<header className="top-header">
+							<div className="page-title">
+								{location.pathname === "/" && "Dashboard"}
+								{location.pathname === "/Data" && "Service Requests"}
+								{location.pathname === "/Input" && "New Request"}
+								{location.pathname === "/Department" && "Department Reports"}
+								{location.pathname.startsWith("/ticket") && "Request Details"}
+							</div>
+							<div className="header-search">
+								<i className="pi pi-search search-icon" />
+								<input 
+									type="text" 
+									className="search-input" 
+									placeholder="Search ticket, subject, dept..."
+									value={searchQuery}
+									onChange={handleSearchChange}
+								/>
+								<span className="search-shortcut">Ctrl+K</span>
+							</div>
+							<div style={{ width: '40px' }} />
+						</header>
 						{/* Scrollable Page Content Frame */}
 						<main className={`page-content ${location.pathname === "/" ? "dashboard-page-content" : ""} ${location.pathname.startsWith("/Department") ? "department-page-content" : ""} ${location.pathname.startsWith("/ticket") ? "ticket-detail-page-content" : ""}`}>
 							<Routes>

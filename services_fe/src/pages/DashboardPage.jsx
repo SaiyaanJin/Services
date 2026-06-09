@@ -66,12 +66,21 @@ const DashboardPage = () => {
 	const { user } = useAuth();
 	const [metrics, setMetrics] = useState([]);
 	const [loadingMetrics, setLoadingMetrics] = useState(true);
+	const [trends, setTrends] = useState({ new_tickets_7d: 0, resolved_tickets_7d: 0, pending_tickets_7d: 0 });
 
 	useEffect(() => {
 		const loadDashboardData = async () => {
 			try {
 				const response = await apiClient.get("/Dashboard");
-				setMetrics(response.data || []);
+				const data = response.data || {};
+				if (Array.isArray(data)) {
+					setMetrics(data);
+				} else {
+					setMetrics(data.department_stats || []);
+					if (data.trends) {
+						setTrends(data.trends);
+					}
+				}
 			} catch (err) {
 				console.error("Error loading dashboard metrics:", err);
 			} finally {
@@ -201,15 +210,14 @@ const DashboardPage = () => {
 				<MetricsSkeleton />
 			) : (
 				<>
-						{/* Row 1: KPI Cards */}
 						<div className="kpi-row">
 							{/* Card 1: Total Tickets */}
 							<div className="kpi-card-custom kpi-purple">
 								<div className="kpi-info-left">
 									<span className="kpi-label-text">TOTAL TICKETS</span>
 									<span className="kpi-value-text">{totalTickets}</span>
-									<div className="kpi-trend-text" style={{ color: '#10b981' }}>
-										<span>↗ 18.5%</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
+									<div className="kpi-trend-text" style={{ color: trends.new_tickets_7d > 0 ? '#10b981' : '#94a3b8' }}>
+										<span>{trends.new_tickets_7d > 0 ? `↗ +${trends.new_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>new in 7 days</span>
 									</div>
 								</div>
 								<div className="kpi-icon-container">
@@ -222,8 +230,8 @@ const DashboardPage = () => {
 								<div className="kpi-info-left">
 									<span className="kpi-label-text">RESOLVED</span>
 									<span className="kpi-value-text">{totalResolved}</span>
-									<div className="kpi-trend-text" style={{ color: '#10b981' }}>
-										<span>↗ 22.7%</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
+									<div className="kpi-trend-text" style={{ color: trends.resolved_tickets_7d > 0 ? '#10b981' : '#94a3b8' }}>
+										<span>{trends.resolved_tickets_7d > 0 ? `↗ +${trends.resolved_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>resolved in 7 days</span>
 									</div>
 								</div>
 								<div className="kpi-icon-container">
@@ -236,8 +244,8 @@ const DashboardPage = () => {
 								<div className="kpi-info-left">
 									<span className="kpi-label-text">OPEN TICKETS</span>
 									<span className="kpi-value-text">{totalPending}</span>
-									<div className="kpi-trend-text" style={{ color: '#f59e0b' }}>
-										<span>↘ 8.3%</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
+									<div className="kpi-trend-text" style={{ color: trends.pending_tickets_7d > 0 ? '#ef4444' : '#94a3b8' }}>
+										<span>{trends.pending_tickets_7d > 0 ? `↗ +${trends.pending_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>new in 7 days</span>
 									</div>
 								</div>
 								<div className="kpi-icon-container">
@@ -250,8 +258,8 @@ const DashboardPage = () => {
 								<div className="kpi-info-left">
 									<span className="kpi-label-text">SLA COMPLIANCE</span>
 									<span className="kpi-value-text">{resolvedPercentage}%</span>
-									<div className="kpi-trend-text" style={{ color: '#3b82f6' }}>
-										<span>↗ 5.2%</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
+									<div className="kpi-trend-text" style={{ color: '#94a3b8' }}>
+										<span>—</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
 									</div>
 								</div>
 								<div className="kpi-icon-container">
@@ -264,8 +272,8 @@ const DashboardPage = () => {
 								<div className="kpi-info-left">
 									<span className="kpi-label-text">AVG RESPONSE TIME</span>
 									<span className="kpi-value-text">2h 34m</span>
-									<div className="kpi-trend-text" style={{ color: '#ef4444' }}>
-										<span>↘ 12%</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
+									<div className="kpi-trend-text" style={{ color: '#94a3b8' }}>
+										<span>—</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
 									</div>
 								</div>
 								<div className="kpi-icon-container">

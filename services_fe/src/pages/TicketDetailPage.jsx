@@ -8,6 +8,8 @@ import { TicketDetailSkeleton } from "../components/common/SkeletonLoader";
 import moment from "moment";
 import apiClient, { API_BASE_URL } from "../api";
 import { getDepartmentBackendName } from "../utils/departmentMap";
+import { getStatusColors } from "../utils/ticketHelpers";
+
 
 // Dynamic styling & theme logic based on Subject category
 const getThemeDetails = (subject) => {
@@ -339,6 +341,7 @@ const TicketDetailPage = () => {
 	// Department status change states
 	const [selectedStatus, setSelectedStatus] = useState(null);
 	const [statusRemarks, setStatusRemarks] = useState("");
+	const [sendingReminder, setSendingReminder] = useState(false);
 	
 	// Load ticket on mount
 	const loadTicketDetails = useCallback(async () => {
@@ -382,17 +385,36 @@ const TicketDetailPage = () => {
 		if (user) loadTicketDetails();
 	}, [user, loadTicketDetails]);
 
-	const getStatusSeverityColor = (status) => {
-		switch (status) {
-			case "New Service Request": return { bg: "#eff6ff", text: "#1d4ed8", dot: "#3b82f6" };
-			case "Under Progress": return { bg: "#fffbeb", text: "#b45309", dot: "#f59e0b" };
-			case "Resolved": return { bg: "#f0fdf4", text: "#15803d", dot: "#22c55e" };
-			case "Closed": return { bg: "#f0fdf4", text: "#15803d", dot: "#22c55e" };
-			case "Can not be Resolved": return { bg: "#fef2f2", text: "#b91c1c", dot: "#ef4444" };
-			case "Working (No Action Required)": return { bg: "#f1f5f9", text: "#334155", dot: "#64748b" };
-			default: return { bg: "#eff6ff", text: "#1d4ed8", dot: "#3b82f6" };
+	const sendReminderMail = async () => {
+		if (!ticket || !ticket.Docket_Number) return;
+		setSendingReminder(true);
+		try {
+			const response = await apiClient.get("/SendTicketReminder", {
+				headers: { Data: String(ticket.Docket_Number) }
+			});
+			if (response.data === "Success") {
+				toast.current?.show({
+					severity: "success",
+					summary: "Reminder Sent",
+					detail: `Reminder email successfully sent to ${ticket.Department} department!`,
+					life: 4000
+				});
+			} else {
+				throw new Error("Failed to send reminder");
+			}
+		} catch (err) {
+			console.error("Failed to send reminder:", err);
+			toast.current?.show({
+				severity: "error",
+				summary: "Error",
+				detail: "Failed to send reminder email. Please try again later.",
+				life: 4000
+			});
+		} finally {
+			setSendingReminder(false);
 		}
 	};
+
 
 	// Parse timeline actions
 	const getTimelineEvents = () => {
@@ -659,7 +681,7 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 	const departmentStaff = canManageTicket();
 	const creator = isCreator();
 	const theme = getThemeDetails(ticket.Subject);
-	const statusColors = getStatusSeverityColor(ticket.Present_Status);
+	const statusColors = getStatusColors(ticket.Present_Status);
 
 	const statusOptions = [
 		{ label: "Under Progress", value: "Under Progress" },
@@ -788,9 +810,48 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 											</div>
 										</div>
 									) : (
-										<p className="m-0 text-700 text-sm line-height-3 white-space-pre-wrap">
-											{ticket.Breif || ticket.description || "No description provided."}
-										</p>
+										<div className="flex flex-column gap-3 align-items-start">
+											<p className="m-0 text-700 text-sm line-height-3 white-space-pre-wrap w-full">
+												{ticket.Breif || ticket.description || "No description provided."}
+											</p>
+											{ticket.Present_Status !== "Resolved" && ticket.Present_Status !== "Closed" && !ticket.Ticket_Closed && (
+												<button
+													className="flex align-items-center gap-2 mt-1"
+													onClick={sendReminderMail}
+													disabled={sendingReminder}
+													style={{ 
+														padding: '8px 18px', 
+														fontSize: '0.8rem', 
+														border: 'none',
+														color: '#ffffff',
+														background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+														borderRadius: '20px',
+														fontWeight: '700',
+														cursor: 'pointer',
+														transition: 'all 0.3s ease',
+														boxShadow: '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)',
+														letterSpacing: '0.3px'
+													}}
+													onMouseEnter={(e) => {
+														e.currentTarget.style.background = 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)';
+														e.currentTarget.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.85), 0 6px 8px rgba(239, 68, 68, 0.25)';
+														e.currentTarget.style.transform = 'translateY(-1px)';
+													}}
+													onMouseLeave={(e) => {
+														e.currentTarget.style.background = 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
+														e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.55), 0 4px 6px rgba(239, 68, 68, 0.15)';
+														e.currentTarget.style.transform = 'translateY(0)';
+													}}
+												>
+													{sendingReminder ? (
+														<i className="pi pi-spin pi-spinner" style={{ fontSize: '0.8rem' }} />
+													) : (
+														<i className="pi pi-bell" style={{ fontSize: '0.8rem' }} />
+													)}
+													<span>Send Reminder to Department</span>
+												</button>
+											)}
+										</div>
 									)}
 								</div>
 							</div>
