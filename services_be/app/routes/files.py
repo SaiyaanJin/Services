@@ -111,7 +111,7 @@ def download_files(
     Secure file zipping and downloading.
     Prevents path traversal, uses unique temporary zip files, and cleans up afterward.
     """
-    file_list = path.split(',')
+    file_list = path.split('|') if '|' in path else path.split(',')
     concat_name = ""
     for file1 in file_list:
         name = file1.replace(" ", "_").replace(")", "").replace("(", "")

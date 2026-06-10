@@ -617,7 +617,7 @@ const TicketDetailPage = () => {
 	const downloadAttachment = () => {
 		const files = getFileList(ticket?.File);
 		if (files.length === 0) return;
-		const filesJoined = files.join(",");
+		const filesJoined = files.join("|");
 		const url = `${API_BASE_URL}/download?path=${encodeURIComponent(filesJoined)}&File_Name=Ticket_${ticket.Docket_Number}_Attachments`;
 		
 		apiClient.get(url, { responseType: "blob" })
