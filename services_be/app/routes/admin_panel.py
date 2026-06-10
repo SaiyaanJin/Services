@@ -1,7 +1,7 @@
 import json
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
 from app.db import db
@@ -245,7 +245,6 @@ def get_full_stats(
     - SLA breach count per department
     - Priority distribution
     """
-    from datetime import timedelta
     import re
 
     def parse_date_str(s):
@@ -424,28 +423,102 @@ def send_announcement(request: Request, background_tasks: BackgroundTasks, curre
             raise HTTPException(status_code=500, detail="Could not fetch employee list from SSO")
 
         from app.services.email_service import email_service
-        html_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #fff; padding: 20px; text-align: center;">
-                    <h2 style="margin: 0;">📢 ERLDC Services Announcement</h2>
-                </div>
-                <div style="padding: 24px; background: #fff;">
-                    <p style="margin-top: 0; white-space: pre-wrap;">{body}</p>
-                    <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 20px 0;" />
-                    <p style="font-size: 12px; color: #64748b;">Sent by {current_user['name']} via ERLDC Services Portal.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{subject}</title>
+</head>
+<body style="margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#f8fafc" style="background-color: #f8fafc; padding: 40px 20px;">
+        <tr>
+            <td align="center" valign="top">
+                <!--[if mso]>
+                <table align="center" border="0" cellspacing="0" cellpadding="0" width="600">
+                <tr>
+                <td align="center" valign="top" width="600">
+                <![endif]-->
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+                    
+                    <!-- Header Bar -->
+                    <tr>
+                        <td align="left" valign="top" bgcolor="#4f46e5" style="background-color: #4f46e5; padding: 32px 32px 28px 32px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="padding: 0 0 12px 0;">
+                                        <table border="0" cellpadding="0" cellspacing="0" bgcolor="#3730a3" style="background-color: #3730a3; border-radius: 100px;">
+                                            <tr>
+                                                <td style="color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                                                    📢 Announcement
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #ffffff; font-size: 24px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.3; margin: 0; padding-top: 4px;">
+                                        {subject}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Main Body -->
+                    <tr>
+                        <td align="left" valign="top" style="padding: 36px 32px 36px 32px; background-color: #ffffff;" bgcolor="#ffffff">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="color: #334155; font-size: 15px; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; white-space: pre-wrap; margin: 0;">{body}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Divider Line -->
+                    <tr>
+                        <td style="padding: 0 32px; background-color: #ffffff;" bgcolor="#ffffff">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="border-top: 1px solid #f1f5f9; height: 1px; line-height: 1px; font-size: 1px;">&nbsp;</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer Section -->
+                    <tr>
+                        <td align="left" valign="top" bgcolor="#f8fafc" style="background-color: #f8fafc; padding: 24px 32px 28px 32px; border-top: 1px solid #f1f5f9;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td style="color: #64748b; font-size: 13px; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                                        Sent by <strong style="color: #334155;">{current_user['name']}</strong>
+                                        <br>
+                                        <span style="color: #94a3b8; font-size: 12px;">via ERLDC Services Portal System</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+                <!--[if mso]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
+</body>
+</html>"""
         background_tasks.add_task(
             email_service._send_exchange_mail,
             subject=f"[ERLDC Services] {subject}",
             html_body=html_body,
-            to_recipients=all_emails[:1],  # Primary recipient
-            cc_recipients=all_emails[1:]   # Rest as CC to avoid spam filters
+            to_recipients=['sanjaykumar@grid-india.in'],  # Primary recipient
+            cc_recipients=all_emails  # Rest as CC to avoid spam filters
         )
         return {"status": "ok", "recipients": len(all_emails)}
     except HTTPException:
