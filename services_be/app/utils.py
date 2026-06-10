@@ -1,9 +1,13 @@
 import json
 import logging
+import asyncio
 from fastapi import Request, HTTPException, status
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Global reference to the main thread's event loop to resolve loop mismatches for large payloads
+MAIN_EVENT_LOOP = None
 
 def parse_request_payload(request: Request) -> Any:
     """
@@ -22,14 +26,33 @@ def parse_request_payload(request: Request) -> Any:
 
     # 2. Try parsing JSON body (standard modern client)
     try:
-        # Check if Content-Type is json
         content_type = request.headers.get("content-type", "")
         if "application/json" in content_type:
-            # Use await request.json() in endpoints, but we can do a sync check here if needed.
-            # We will handle JSON body directly in endpoints if headers are not present.
-            pass
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                # If there's already a running loop in the current thread,
+                # check if Starlette has already parsed it and cached it.
+                if hasattr(request, "_json"):
+                    return request._json
+                # If not cached, run request.json() in a separate thread/loop to avoid blocking the current loop
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, request.json())
+                    return future.result()
+            else:
+                # We are in a synchronous endpoint running on a threadpool thread.
+                # Use run_coroutine_threadsafe to schedule request.json() on the main loop.
+                if MAIN_EVENT_LOOP and MAIN_EVENT_LOOP.is_running():
+                    future = asyncio.run_coroutine_threadsafe(request.json(), MAIN_EVENT_LOOP)
+                    return future.result()
+                else:
+                    return asyncio.run(request.json())
     except Exception as e:
-        logger.error(f"Error checking content type: {e}")
+        logger.error(f"Error parsing JSON body in parse_request_payload: {e}")
 
     return None
 
@@ -79,3 +102,42 @@ def get_normalized_departments(sso_dept: str) -> list:
         return DEPARTMENT_MAP["SO"]
         
     return [sso_dept]
+
+
+BACKEND_TO_SSO_MAP = {
+    "HUMAN RESOURCE": "HR",
+    "CONTRACTS & SERVICES": "CS",
+    "CONTRACT SERVICES": "CS",
+    "FINANCE & ACCOUNTS": "F&A",
+    "FINANCE": "F&A",
+    "INFORMATION TECHNOLOGY": "IT",
+    "LOGISTICS- IT SERVICES": "IT",
+    "LOGISTICS : IT": "IT",
+    "CYBER SECURITY": "IT",
+    "COMMUNICATION": "COMMUNICATION",
+    "LOGISTICS- COMMUNICATION": "COMMUNICATION",
+    "SCADA": "SCADA",
+    "LOGISTICS- OT (DECISION SUPPORT)": "SCADA",
+    "LOGISTICS : OT (DECISION SUPPORT)": "SCADA",
+    "TECHNICAL SERVICES": "TS",
+    "LOGISTICS- TECHNICAL SERVICES": "TS",
+    "LOGISTICS : TS": "TS",
+    "MARKET OPERATION": "MO",
+    "SYSTEM OPERATION": "SO"
+}
+
+def get_sso_department_code(display_name: str) -> str:
+    """Resolves a department display name or backend category name back to its SSO short code"""
+    if not display_name:
+        return ""
+    name_upper = display_name.upper().strip()
+    
+    if name_upper in BACKEND_TO_SSO_MAP:
+        return BACKEND_TO_SSO_MAP[name_upper]
+        
+    for k, v in BACKEND_TO_SSO_MAP.items():
+        if k in name_upper or name_upper in k:
+            return v
+            
+    return display_name
+

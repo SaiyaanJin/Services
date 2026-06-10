@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
 import logging
+import jwt as pyjwt
+from datetime import datetime, timedelta
 from exchangelib import Credentials, Account, Configuration, DELEGATE, Message, HTMLBody
 from fastapi import BackgroundTasks
 from app.config import settings
@@ -205,6 +208,22 @@ class EmailService:
         if cc_email and "@" in cc_email:
             cc_recipients.append(cc_email)
 
+        csat_block = ""
+        if status_choice == "Resolved":
+            csat_block = f"""
+            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
+                <p style="margin: 0 0 10px 0; font-weight: bold; color: #16a34a; font-size: 14px;">Please rate the resolution of your service request:</p>
+                <div style="font-size: 24px; letter-spacing: 12px; margin: 10px 0;">
+                    <a href="{settings.FRONTEND_BASE_URL}/csat?token={self.generate_csat_token(docket_no)}&rating=1" style="text-decoration: none;" title="1 Star">&#11088;</a>
+                    <a href="{settings.FRONTEND_BASE_URL}/csat?token={self.generate_csat_token(docket_no)}&rating=2" style="text-decoration: none;" title="2 Stars">&#11088;</a>
+                    <a href="{settings.FRONTEND_BASE_URL}/csat?token={self.generate_csat_token(docket_no)}&rating=3" style="text-decoration: none;" title="3 Stars">&#11088;</a>
+                    <a href="{settings.FRONTEND_BASE_URL}/csat?token={self.generate_csat_token(docket_no)}&rating=4" style="text-decoration: none;" title="4 Stars">&#11088;</a>
+                    <a href="{settings.FRONTEND_BASE_URL}/csat?token={self.generate_csat_token(docket_no)}&rating=5" style="text-decoration: none;" title="5 Stars">&#11088;</a>
+                </div>
+                <p style="margin: 8px 0 0 0; font-size: 12px; color: #16a34a;">Click on a star above to submit your rating directly.</p>
+            </div>
+            """
+
         html_body = f"""
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
@@ -235,6 +254,8 @@ class EmailService:
                             </tr>
                         </table>
                         
+                        {csat_block}
+
                         <div style="background-color: #f8fafc; border-left: 4px solid #10b981; padding: 12px 16px; margin: 20px 0; border-radius: 0 4px 4px 0;">
                             <p style="margin: 0; font-weight: bold; font-size: 14px;">Next Steps:</p>
                             <p style="margin: 4px 0 0 0; font-size: 13px;">Please log in to the portal to Accept/Deny the service request status. If accepted, the ticket will close.</p>
@@ -258,5 +279,94 @@ class EmailService:
             to_recipients=[issuer_email],
             cc_recipients=cc_recipients
         )
+
+    def send_watcher_notification(self, ticket: dict, new_status: str, changed_by: str, background_tasks: BackgroundTasks, exclude_email: str = None):
+        """Send email to all ticket watchers when status changes"""
+        watchers = ticket.get("Watchers", [])
+        if not watchers:
+            return
+
+        docket_no = ticket.get("Docket_Number")
+        subject_line = f"Watched Ticket Updated: #{docket_no} — {ticket.get('Subject', '')[:50]}"
+
+        for watcher in watchers:
+            watcher_email = watcher.get("email", "")
+            if not watcher_email or not "@" in watcher_email:
+                continue
+            if exclude_email and watcher_email == exclude_email:
+                continue
+
+            html_body = f"""
+            <html><body style="font-family: Arial, sans-serif; color: #333;">
+                <div style="max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                    <div style="background: #6366f1; color: #fff; padding: 16px 20px;">
+                        <h3 style="margin: 0;">🔔 Watched Ticket Updated</h3>
+                    </div>
+                    <div style="padding: 20px;">
+                        <p>Hello {watcher.get('name', 'there')},</p>
+                        <p>A ticket you are watching has been updated.</p>
+                        <table style="width:100%; border-collapse: collapse;">
+                            <tr><td style="padding:8px 0; font-weight:bold; width:35%;">Docket #:</td><td style="padding:8px 0; color:#6366f1; font-weight:bold;">{docket_no}</td></tr>
+                            <tr><td style="padding:8px 0; font-weight:bold;">Subject:</td><td style="padding:8px 0;">{ticket.get('Subject')}</td></tr>
+                            <tr><td style="padding:8px 0; font-weight:bold;">New Status:</td><td style="padding:8px 0; font-weight:bold; color:#10b981;">{new_status}</td></tr>
+                            <tr><td style="padding:8px 0; font-weight:bold;">Changed By:</td><td style="padding:8px 0;">{changed_by}</td></tr>
+                        </table>
+                        <div style="text-align:center; margin-top:20px;">
+                            <a href="{settings.FRONTEND_BASE_URL}/ticket/{docket_no}" style="background:#6366f1; color:#fff; padding:10px 24px; text-decoration:none; border-radius:20px; font-weight:bold;">View Ticket</a>
+                        </div>
+                    </div>
+                </div>
+            </body></html>
+            """
+            background_tasks.add_task(
+                self._send_exchange_mail,
+                subject=subject_line,
+                html_body=html_body,
+                to_recipients=[watcher_email]
+            )
+
+    def send_assignment_notification(self, ticket: dict, assignee_name: str, assignee_email: str, assigned_by: str, background_tasks: BackgroundTasks):
+        """Notify an employee that a ticket has been assigned to them"""
+        docket_no = ticket.get("Docket_Number")
+        subject = f"Ticket Assigned to You: #{docket_no} — {ticket.get('Subject', '')[:50]}"
+
+        html_body = f"""
+        <html><body style="font-family: Arial, sans-serif; color: #333;">
+            <div style="max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #fff; padding: 16px 20px;">
+                    <h3 style="margin: 0;">📋 Ticket Assigned to You</h3>
+                </div>
+                <div style="padding: 20px;">
+                    <p>Hello {assignee_name},</p>
+                    <p><strong>{assigned_by}</strong> has assigned a service request ticket to you.</p>
+                    <table style="width:100%; border-collapse: collapse;">
+                        <tr><td style="padding:8px 0; font-weight:bold; width:35%;">Docket #:</td><td style="padding:8px 0; color:#f59e0b; font-weight:bold;">{docket_no}</td></tr>
+                        <tr><td style="padding:8px 0; font-weight:bold;">Subject:</td><td style="padding:8px 0;">{ticket.get('Subject')}</td></tr>
+                        <tr><td style="padding:8px 0; font-weight:bold;">Department:</td><td style="padding:8px 0;">{ticket.get('Department')}</td></tr>
+                        <tr><td style="padding:8px 0; font-weight:bold;">Raised By:</td><td style="padding:8px 0;">{ticket.get('Data_Filled_by')}</td></tr>
+                        <tr><td style="padding:8px 0; font-weight:bold; vertical-align:top;">Description:</td><td style="padding:8px 0; white-space:pre-wrap;">{ticket.get('Breif') or ticket.get('description', '')}</td></tr>
+                    </table>
+                    <div style="text-align:center; margin-top:20px;">
+                        <a href="{settings.FRONTEND_BASE_URL}/ticket/{docket_no}" style="background:#f59e0b; color:#fff; padding:10px 24px; text-decoration:none; border-radius:20px; font-weight:bold;">View & Handle Ticket</a>
+                    </div>
+                </div>
+            </div>
+        </body></html>
+        """
+        background_tasks.add_task(
+            self._send_exchange_mail,
+            subject=subject,
+            html_body=html_body,
+            to_recipients=[assignee_email]
+        )
+
+    def generate_csat_token(self, docket_number: int) -> str:
+        """Generate a signed JWT token for CSAT rating link (expires in 7 days)"""
+        payload = {
+            "docket": docket_number,
+            "type": "csat",
+            "exp": datetime.utcnow() + timedelta(days=7)
+        }
+        return pyjwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
 
 email_service = EmailService()

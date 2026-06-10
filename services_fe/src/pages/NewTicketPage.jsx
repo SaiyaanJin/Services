@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dropdown } from "primereact/dropdown";
+import { MultiSelect } from "primereact/multiselect";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Checkbox } from "primereact/checkbox";
@@ -24,6 +25,60 @@ const NewTicketPage = () => {
 	const [subject, setSubject] = useState("");
 	const [description, setDescription] = useState("");
 	const [declared, setDeclared] = useState(false);
+	const [priority, setPriority] = useState("Medium");
+	const [tags, setTags] = useState([]);
+	
+	// Config states
+	const [configuredTags, setConfiguredTags] = useState([]);
+	const [templates, setTemplates] = useState([]);
+	const [selectedTemplate, setSelectedTemplate] = useState(null);
+
+	const getFilteredTemplates = () => {
+		if (!selectedDept) return [];
+		let targetDeptName = "";
+		if (selectedDept === "HR") targetDeptName = "Human Resource";
+		else if (selectedDept === "CS") targetDeptName = "Contracts & Services";
+		else if (selectedDept === "FA") targetDeptName = "Finance & Accounts";
+		else if (selectedDept === "CYBER") targetDeptName = "Cyber Security";
+		else if (selectedDivision) {
+			targetDeptName = selectedDivision;
+		} else {
+			if (selectedDept === "SO") targetDeptName = "System Operation";
+			if (selectedDept === "MO") targetDeptName = "Market Operation";
+			if (selectedDept === "LOGISTICS") targetDeptName = "Logistics";
+		}
+		
+		return templates.filter(t => 
+			t.department && (
+				t.department.toLowerCase().includes(targetDeptName.toLowerCase()) ||
+				targetDeptName.toLowerCase().includes(t.department.toLowerCase())
+			)
+		);
+	};
+	const filteredTemplates = getFilteredTemplates();
+
+	const handleTemplateChange = (e) => {
+		const val = e.value;
+		setSelectedTemplate(val);
+		if (!val) return;
+		const template = templates.find(t => t.id === val);
+		if (template) {
+			if (template.default_subject) {
+				setSubject(template.default_subject);
+				localStorage.setItem("draft_subject", template.default_subject);
+				triggerSuggestions(template.default_subject);
+			}
+			if (template.default_description) {
+				setDescription(template.default_description);
+				localStorage.setItem("draft_description", template.default_description);
+			}
+		}
+	};
+
+
+	// Suggestion & duplicate states
+	const [duplicates, setDuplicates] = useState([]);
+	const [kbArticles, setKbArticles] = useState([]);
 	
 	// Uploaded files list
 	const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -35,12 +90,39 @@ const NewTicketPage = () => {
 	const fileUploadRef = useRef(null);
 
 	// Load drafts on mount
+	// Load configs, templates, and drafts on mount
 	useEffect(() => {
+		apiClient.get("/admin/tags").then(res => setConfiguredTags(res.data || [])).catch(() => {});
+		apiClient.get("/admin/templates").then(res => setTemplates(res.data || [])).catch(() => {});
+
 		const savedSubject = localStorage.getItem("draft_subject");
 		const savedDesc = localStorage.getItem("draft_description");
-		if (savedSubject) setSubject(savedSubject);
+		if (savedSubject) {
+			setSubject(savedSubject);
+			triggerSuggestions(savedSubject);
+		}
 		if (savedDesc) setDescription(savedDesc);
 	}, []);
+
+	const triggerSuggestions = async (subj) => {
+		if (!subj || subj.trim().length < 4) {
+			setDuplicates([]);
+			setKbArticles([]);
+			return;
+		}
+		try {
+			const dupRes = await apiClient.get(`/tickets/search?q=${encodeURIComponent(subj)}`);
+			setDuplicates(dupRes.data || []);
+		} catch (e) {
+			setDuplicates([]);
+		}
+		try {
+			const kbRes = await apiClient.get(`/kb/search?q=${encodeURIComponent(subj)}`);
+			setKbArticles(kbRes.data || []);
+		} catch (e) {
+			setKbArticles([]);
+		}
+	};
 
 	// Auto-save drafts to localStorage
 	const handleSubjectChange = (val) => {
@@ -59,6 +141,11 @@ const NewTicketPage = () => {
 		setSubject("");
 		setDescription("");
 		setUploadedFiles([]);
+		setDuplicates([]);
+		setKbArticles([]);
+		setTags([]);
+		setPriority("Medium");
+		setSelectedTemplate(null);
 		if (fileUploadRef.current) {
 			fileUploadRef.current.clear();
 		}
@@ -189,7 +276,9 @@ const NewTicketPage = () => {
 			Present_Status: "New Service Request",
 			Actions_Taken: [],
 			Old_Status: "",
-			Ticket_Closed: false
+			Ticket_Closed: false,
+			Priority: priority,
+			Tags: tags
 		};
 
 		try {
@@ -262,6 +351,7 @@ const NewTicketPage = () => {
 									onChange={(e) => {
 										setSelectedDept(e.value);
 										setSelectedDivision(null);
+										setSelectedTemplate(null);
 									}}
 									placeholder="Select department..."
 								/>
@@ -275,12 +365,107 @@ const NewTicketPage = () => {
 								<InputText
 									value={subject}
 									onChange={(e) => handleSubjectChange(e.target.value)}
+									onBlur={() => triggerSuggestions(subject)}
 									placeholder="Summarize your service request briefly..."
 									maxLength={100}
 								/>
 							</div>
 						</div>
 					</div>
+
+					{/* Template Picker */}
+					{filteredTemplates.length > 0 && (
+						<div className="flex flex-column gap-2 animate-slide-up">
+							<label className="text-sm font-semibold text-800">Use a Template</label>
+							<div className="input-with-icon">
+								<i className="pi pi-clone" style={{ left: "14px" }} />
+								<Dropdown
+									value={selectedTemplate}
+									options={filteredTemplates.map(t => ({ label: t.name, value: t.id }))}
+									onChange={handleTemplateChange}
+									placeholder="Select a pre-configured template..."
+									showClear
+									className="w-full"
+								/>
+							</div>
+						</div>
+					)}
+
+					{/* Duplicate Detection Warning */}
+					{duplicates.length > 0 && (
+						<div style={{
+							background: "#fffbeb",
+							border: "1px solid #fef3c7",
+							borderRadius: "12px",
+							padding: "16px",
+							display: "flex",
+							flexDirection: "column",
+							gap: "8px"
+						}} className="animate-slide-up">
+							<div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#d97706", fontWeight: "700", fontSize: "0.85rem" }}>
+								<i className="pi pi-exclamation-triangle" />
+								Warning: Similar open tickets found in queue
+							</div>
+							<div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+								{duplicates.map(dup => (
+									<a 
+										key={dup.Docket_Number} 
+										href={`/ticket/${dup.Docket_Number}`}
+										target="_blank"
+										rel="noopener noreferrer"
+										style={{ color: "#b45309", fontSize: "0.78rem", textDecoration: "underline" }}
+									>
+										Docket #{dup.Docket_Number}: {dup.Subject} ({dup.Present_Status})
+									</a>
+								))}
+							</div>
+						</div>
+					)}
+
+					{/* KB Articles Suggestions */}
+					{kbArticles.length > 0 && (
+						<div style={{
+							background: "#f0fdf4",
+							border: "1px solid #dcfce7",
+							borderRadius: "12px",
+							padding: "16px",
+							display: "flex",
+							flexDirection: "column",
+							gap: "10px"
+						}} className="animate-slide-up">
+							<div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#16a34a", fontWeight: "700", fontSize: "0.85rem" }}>
+								<i className="pi pi-lightbulb" />
+								Before you submit: Did you find these articles helpful?
+							</div>
+							<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+								{kbArticles.map(art => (
+									<div key={art.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+										<span style={{ color: "#15803d", fontSize: "0.78rem", fontWeight: "600" }}>
+											💡 {art.title} — <span style={{ color: "#64748b", fontWeight: "400" }}>{art.summary}</span>
+										</span>
+										<button
+											type="button"
+											onClick={() => {
+												toast.current?.show({
+													severity: "success",
+													summary: "Issue Resolved",
+													detail: "Thank you for using the Knowledge Base! Form cleared."
+												});
+												clearDrafts();
+											}}
+											style={{
+												padding: "4px 10px", background: "#16a34a", color: "#fff",
+												border: "none", borderRadius: "4px", fontSize: "0.7rem",
+												cursor: "pointer", fontWeight: "600"
+											}}
+										>
+											This resolved my issue
+										</button>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
 
 					{/* Division Selection (Conditionally displayed) */}
 					{showDivisionSelector && (
@@ -299,6 +484,42 @@ const NewTicketPage = () => {
 							</div>
 						</div>
 					)}
+
+					{/* Priority & Tags Selection */}
+					<div className="grid col-12 p-0 m-0 gap-4">
+						<div className="col flex flex-column gap-2 p-0">
+							<label className="text-sm font-semibold text-800">Priority</label>
+							<div className="input-with-icon">
+								<i className="pi pi-exclamation-triangle" />
+								<Dropdown
+									value={priority}
+									options={[
+										{ label: "🔴 Critical", value: "Critical" },
+										{ label: "🟠 High", value: "High" },
+										{ label: "🟡 Medium", value: "Medium" },
+										{ label: "🟢 Low", value: "Low" }
+									]}
+									onChange={(e) => setPriority(e.value)}
+									placeholder="Select priority..."
+								/>
+							</div>
+						</div>
+
+						<div className="col flex flex-column gap-2 p-0">
+							<label className="text-sm font-semibold text-800">Tags</label>
+							<div className="input-with-icon">
+								<i className="pi pi-tag" />
+								<MultiSelect
+									value={tags}
+									options={configuredTags.map(t => ({ label: `#${t.name}`, value: t.name }))}
+									onChange={(e) => setTags(e.value)}
+									placeholder="Select tags..."
+									display="chip"
+									className="w-full"
+								/>
+							</div>
+						</div>
+					</div>
 
 					{/* Detailed Description */}
 					<div className="flex flex-column gap-2">
@@ -330,7 +551,7 @@ const NewTicketPage = () => {
 							customUpload
 							uploadHandler={onUploadHandler}
 							multiple
-							accept=".txt,.pdf,.png,.jpg,.jpeg,.gif"
+							accept=".txt,.pdf,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg,.log,.csv,.json,.xml,.md"
 							maxFileSize={10000000}
 							emptyTemplate={
 								<div className="flex flex-column align-items-center justify-content-center py-5 border-2 border-dashed border-round-xl bg-slate-50 cursor-pointer" style={{ borderColor: '#c7d2fe' }}>
@@ -338,7 +559,7 @@ const NewTicketPage = () => {
 										<i className="pi pi-cloud-upload" style={{ fontSize: "1.5rem" }}></i>
 									</div>
 									<span className="text-sm font-semibold text-700">Drag & drop files here, or click to browse</span>
-									<span className="text-xs text-500 mt-1">Allowed formats: PDF, TXT, PNG, JPG, GIF (Max 10MB per file)</span>
+									<span className="text-xs text-500 mt-1">Allowed formats: PDF, TXT, PNG, JPG, GIF, BMP, WEBP, SVG, LOG, CSV, JSON, XML, MD (Max 10MB per file)</span>
 								</div>
 							}
 							className="premium-uploader border-round-xl"

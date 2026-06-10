@@ -6,12 +6,19 @@ import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { Button } from "primereact/button";
 import { InputSwitch } from "primereact/inputswitch";
+import { Calendar } from "primereact/calendar";
+import { MultiSelect } from "primereact/multiselect";
 import { Toast } from "primereact/toast";
+import moment from "moment";
 import { useAuth } from "../context/AuthContext";
 import { useTickets } from "../hooks/useTickets";
 import { TableSkeleton } from "../components/common/SkeletonLoader";
 import EmptyState from "../components/common/EmptyState";
 import { getDepartmentBackendName } from "../utils/departmentMap";
+import apiClient from "../api";
+import PriorityBadge from "../components/tickets/PriorityBadge";
+import SlaTimer from "../components/tickets/SlaTimer";
+import KanbanBoard from "../components/kanban/KanbanBoard";
 
 import { getInitials, getAvatarColorClass, getSubjectIconInfo, getDeptIconInfo, getStatusColors } from "../utils/ticketHelpers";
 
@@ -25,6 +32,23 @@ const TicketListPage = () => {
 	const [rawTickets, setRawTickets] = useState([]);
 	const [filteredTickets, setFilteredTickets] = useState([]);
 	const [departmentalView, setDepartmentalView] = useState(false);
+	const [viewMode, setViewMode] = useState("table");
+	const [selectedTickets, setSelectedTickets] = useState([]);
+	
+	// Date and Tag filters
+	const [dateFrom, setDateFrom] = useState(null);
+	const [dateTo, setDateTo] = useState(null);
+	const [selectedTags, setSelectedTags] = useState([]);
+	const [allTags, setAllTags] = useState([]);
+
+	// Bulk Actions toolbar states
+	const [bulkStatus, setBulkStatus] = useState(null);
+	const [bulkTag, setBulkTag] = useState(null);
+
+	// Fetch tags on mount
+	useEffect(() => {
+		apiClient.get("/admin/tags").then(res => setAllTags(res.data || [])).catch(() => {});
+	}, []);
 	
 	// Filter states
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -64,6 +88,80 @@ const TicketListPage = () => {
 		loadTickets();
 	}, [loadTickets]);
 
+	const handleBulkStatusUpdate = async () => {
+		if (selectedTickets.length === 0 || !bulkStatus) return;
+		const dockets = selectedTickets.map(t => t.Docket_Number);
+		try {
+			await apiClient.post("/tickets/bulk-status", {
+				docket_numbers: dockets,
+				status: bulkStatus
+			});
+			toast.current?.show({
+				severity: "success",
+				summary: "Bulk Update",
+				detail: `Successfully updated status for ${dockets.length} tickets`
+			});
+			setSelectedTickets([]);
+			setBulkStatus(null);
+			loadTickets();
+		} catch (err) {
+			toast.current?.show({
+				severity: "error",
+				summary: "Bulk Update Failed",
+				detail: "Could not update tickets status"
+			});
+		}
+	};
+
+	const handleBulkTagAdd = async () => {
+		if (selectedTickets.length === 0 || !bulkTag) return;
+		const dockets = selectedTickets.map(t => t.Docket_Number);
+		try {
+			await Promise.all(selectedTickets.map(async (ticket) => {
+				const existingTags = ticket.Tags || [];
+				if (!existingTags.includes(bulkTag)) {
+					await apiClient.post("/UserInputupdate", {
+						Docket_Number: ticket.Docket_Number,
+						Tags: [...existingTags, bulkTag]
+					});
+				}
+			}));
+			toast.current?.show({
+				severity: "success",
+				summary: "Bulk Tag Added",
+				detail: `Successfully added tag #${bulkTag} to ${dockets.length} tickets`
+			});
+			setSelectedTickets([]);
+			setBulkTag(null);
+			loadTickets();
+		} catch (err) {
+			toast.current?.show({
+				severity: "error",
+				summary: "Bulk Tag Failed",
+				detail: "Could not add tags"
+			});
+		}
+	};
+
+	const exportSelectedExcel = () => {
+		import("xlsx").then((xlsx) => {
+			const exportData = selectedTickets.map((t) => ({
+				"Docket Number": t.Docket_Number,
+				"Subject": t.Subject,
+				"Raising Date": t.Input_Date,
+				"Department": t.Department,
+				"Raised By": t.Data_Filled_by,
+				"User Department": t.User_Department,
+				"Current Status": t.Present_Status,
+				"Ticket Closed": t.Ticket_Closed ? "Yes" : "No"
+			}));
+			const worksheet = xlsx.utils.json_to_sheet(exportData);
+			const workbook = { Sheets: { data: worksheet }, SheetNames: ["data"] };
+			const excelBuffer = xlsx.write(workbook, { bookType: "xlsx", type: "array" });
+			saveAsExcelFile(excelBuffer, "Selected_Service_Tickets");
+		});
+	};
+
 	// Apply filtering on query search or filters change
 	useEffect(() => {
 		let result = [...rawTickets];
@@ -82,8 +180,29 @@ const TicketListPage = () => {
 			result = result.filter((t) => t.Present_Status === statusFilter);
 		}
 
+		// Tag Filter
+		if (selectedTags && selectedTags.length > 0) {
+			result = result.filter((t) => 
+				t.Tags && t.Tags.some(tag => selectedTags.includes(tag))
+			);
+		}
+
+		// Date Filter
+		if (dateFrom) {
+			result = result.filter((t) => {
+				const ticketDate = moment(t.Input_Date, ["DD-MM-YYYY hh:mm a", "DD-MM-YYYY hh:mma", "DD-MM-YYYY HH:mm", "DD-MM-YYYY HH:mm:ss"]);
+				return ticketDate.isValid() && ticketDate.isSameOrAfter(moment(dateFrom).startOf('day'));
+			});
+		}
+		if (dateTo) {
+			result = result.filter((t) => {
+				const ticketDate = moment(t.Input_Date, ["DD-MM-YYYY hh:mm a", "DD-MM-YYYY hh:mma", "DD-MM-YYYY HH:mm", "DD-MM-YYYY HH:mm:ss"]);
+				return ticketDate.isValid() && ticketDate.isSameOrBefore(moment(dateTo).endOf('day'));
+			});
+		}
+
 		setFilteredTickets(result);
-	}, [rawTickets, searchQuery, statusFilter]);
+	}, [rawTickets, searchQuery, statusFilter, selectedTags, dateFrom, dateTo]);
 
 	const exportExcel = () => {
 		import("xlsx").then((xlsx) => {
@@ -245,6 +364,41 @@ const TicketListPage = () => {
 				</div>
 
 				<div className="flex flex-wrap align-items-center gap-3">
+					<div className="flex align-items-center gap-1 bg-slate-100 p-1 border-round-xl" style={{ border: '1px solid var(--surface-border, #e2e8f0)' }}>
+						<button 
+							onClick={() => setViewMode("table")} 
+							style={{
+								padding: '6px 12px',
+								background: viewMode === "table" ? '#ffffff' : 'transparent',
+								color: viewMode === "table" ? '#6366f1' : '#64748b',
+								border: 'none',
+								borderRadius: '8px',
+								cursor: 'pointer',
+								fontWeight: '600',
+								fontSize: '0.78rem',
+								boxShadow: viewMode === "table" ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+							}}
+						>
+							<i className="pi pi-table mr-1" /> Table
+						</button>
+						<button 
+							onClick={() => setViewMode("kanban")} 
+							style={{
+								padding: '6px 12px',
+								background: viewMode === "kanban" ? '#ffffff' : 'transparent',
+								color: viewMode === "kanban" ? '#6366f1' : '#64748b',
+								border: 'none',
+								borderRadius: '8px',
+								cursor: 'pointer',
+								fontWeight: '600',
+								fontSize: '0.78rem',
+								boxShadow: viewMode === "kanban" ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+							}}
+						>
+							<i className="pi pi-th-large mr-1" /> Kanban
+						</button>
+					</div>
+
 					<div className="flex align-items-center gap-2 bg-indigo-50 px-3 py-2 border-round-pill">
 						<span className="text-xs font-bold text-indigo-800 uppercase tracking-wider pl-1">Departmental View</span>
 						<InputSwitch 
@@ -277,38 +431,143 @@ const TicketListPage = () => {
 			{/* Table Card */}
 			<div className="tickets-list-card">
 				{/* Filters Section */}
-				<div className="flex flex-column sm:flex-row gap-3 mb-2 align-items-center">
-					<span className="p-input-icon-left w-full sm:w-20rem">
-						<i className="pi pi-search text-400" style={{ left: '14px' }} />
-						<InputText 
-							value={searchQuery} 
-							onChange={(e) => setSearchQuery(e.target.value)} 
-							placeholder="Search tickets..." 
-							className="w-full search-queue-input"
-						/>
-					</span>
-					<div className="w-full sm:w-15rem">
+				<div className="flex flex-column gap-3 mb-4">
+					<div className="flex flex-wrap gap-3 align-items-center">
+						<span className="p-input-icon-left" style={{ flex: '1 1 200px', minWidth: '200px' }}>
+							<i className="pi pi-search text-400" style={{ left: '14px' }} />
+							<InputText 
+								value={searchQuery} 
+								onChange={(e) => setSearchQuery(e.target.value)} 
+								placeholder="Search tickets..." 
+								className="w-full search-queue-input"
+							/>
+						</span>
 						<Dropdown 
 							value={statusFilter} 
 							options={statusOptions} 
 							onChange={(e) => setStatusFilter(e.value)} 
 							placeholder="Filter by Status" 
 							showClear
-							className="w-full status-filter-dropdown"
+							style={{ flex: '1 1 180px', minWidth: '180px' }}
+							className="status-filter-dropdown"
 						/>
+						<MultiSelect
+							value={selectedTags}
+							options={allTags.map(t => ({ label: `#${t.name}`, value: t.name }))}
+							onChange={(e) => setSelectedTags(e.value)}
+							placeholder="Filter by Tags"
+							style={{ flex: '1 1 200px', minWidth: '200px' }}
+							display="chip"
+						/>
+						<Calendar
+							value={dateFrom}
+							onChange={(e) => setDateFrom(e.value)}
+							placeholder="From Date"
+							dateFormat="dd-mm-yy"
+							showIcon
+							style={{ flex: '1 1 160px', minWidth: '160px' }}
+						/>
+						<Calendar
+							value={dateTo}
+							onChange={(e) => setDateTo(e.value)}
+							placeholder="To Date"
+							dateFormat="dd-mm-yy"
+							showIcon
+							style={{ flex: '1 1 160px', minWidth: '160px' }}
+						/>
+						{(dateFrom || dateTo || selectedTags.length > 0 || statusFilter) && (
+							<Button 
+								icon="pi pi-filter-slash" 
+								className="p-button-rounded p-button-text p-button-plain"
+								title="Clear all filters"
+								onClick={() => {
+									setDateFrom(null);
+									setDateTo(null);
+									setSelectedTags([]);
+									setStatusFilter(null);
+								}}
+							/>
+						)}
 					</div>
+
+					{/* Bulk Actions Toolbar */}
+					{selectedTickets.length > 0 && (
+						<div style={{
+							display: 'flex',
+							alignItems: 'center',
+							gap: '12px',
+							background: '#ede9fe',
+							border: '1px solid #c7d2fe',
+							padding: '8px 16px',
+							borderRadius: '8px',
+							flexWrap: 'wrap'
+						}} className="animate-slide-up">
+							<span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#4f46e5' }}>
+								{selectedTickets.length} tickets selected
+							</span>
+							<div style={{ width: '1px', height: '16px', background: '#c7d2fe' }} />
+							
+							{/* Bulk Status Update */}
+							<Dropdown
+								value={bulkStatus}
+								options={statusOptions}
+								onChange={(e) => setBulkStatus(e.value)}
+								placeholder="Update Status..."
+								style={{ width: '180px' }}
+							/>
+							<Button 
+								label="Apply Status" 
+								onClick={handleBulkStatusUpdate}
+								disabled={!bulkStatus}
+								className="p-button-indigo"
+								style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+							/>
+							
+							{/* Bulk Tag Add */}
+							<Dropdown
+								value={bulkTag}
+								options={allTags.map(t => ({ label: `#${t.name}`, value: t.name }))}
+								onChange={(e) => setBulkTag(e.value)}
+								placeholder="Add Tag..."
+								style={{ width: '160px' }}
+							/>
+							<Button 
+								label="Add Tag" 
+								onClick={handleBulkTagAdd}
+								disabled={!bulkTag}
+								className="p-button-indigo"
+								style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+							/>
+
+							{/* Bulk Export */}
+							<Button 
+								label="Export Selected" 
+								icon="pi pi-file-excel"
+								onClick={exportSelectedExcel}
+								className="p-button-success"
+								style={{ padding: '6px 12px', fontSize: '0.78rem', marginLeft: 'auto' }}
+							/>
+						</div>
+					)}
 				</div>
 
-				{/* Table Section */}
+				{/* Content Section (Table or Kanban) */}
 				{loading ? (
 					<div style={{ marginTop: '24px' }}><TableSkeleton /></div>
 				) : filteredTickets.length === 0 ? (
 					<EmptyState 
-						title={searchQuery || statusFilter ? "No matching tickets found" : "No tickets found"}
-						description={searchQuery || statusFilter ? "Try adjusting your search filters." : "Create your first service ticket by clicking 'New Request'."}
+						title={searchQuery || statusFilter || selectedTags.length > 0 || dateFrom || dateTo ? "No matching tickets found" : "No tickets found"}
+						description={searchQuery || statusFilter || selectedTags.length > 0 || dateFrom || dateTo ? "Try adjusting your search filters." : "Create your first service ticket by clicking 'New Request'."}
 						icon="pi pi-folder"
-						actionLabel={!(searchQuery || statusFilter) && "New Request"}
+						actionLabel={!(searchQuery || statusFilter || selectedTags.length > 0 || dateFrom || dateTo) && "New Request"}
 						onAction={() => navigate("/Input")}
+					/>
+				) : viewMode === "kanban" ? (
+					<KanbanBoard 
+						tickets={filteredTickets} 
+						currentUser={user} 
+						onTicketUpdate={() => loadTickets()} 
+						canUpdateStatus={true} 
 					/>
 				) : (
 					<DataTable 
@@ -321,53 +580,71 @@ const TicketListPage = () => {
 						responsiveLayout="scroll"
 						onRowClick={(e) => navigate(`/ticket/${e.data.Docket_Number}`)}
 						rowClassName={() => "cursor-pointer"}
+						selection={selectedTickets}
+						onSelectionChange={(e) => setSelectedTickets(e.value)}
+						dataKey="Docket_Number"
 						className="tickets-list-table"
 					>
+						<Column selectionMode="multiple" headerStyle={{ width: '3rem' }}></Column>
 						<Column 
 							field="Docket_Number" 
 							header="Docket No." 
 							sortable 
 							body={docketTemplate}
-							style={{ width: "9rem" }} 
+							style={{ width: "8rem" }} 
 						/>
 						<Column 
 							field="Subject" 
 							header="Subject" 
 							sortable 
 							body={subjectTemplate}
-							style={{ minWidth: "18rem" }} 
+							style={{ minWidth: "16rem" }} 
+						/>
+						<Column 
+							field="Priority" 
+							header="Priority" 
+							sortable 
+							body={(rowData) => <PriorityBadge priority={rowData.Priority} size="xs" />}
+							style={{ width: "7rem" }} 
+						/>
+						<Column 
+							field="SLA_Deadline" 
+							header="SLA Countdown" 
+							sortable 
+							body={(rowData) => <SlaTimer slaDeadline={rowData.SLA_Deadline} presentStatus={rowData.Present_Status} />}
+							style={{ minWidth: "10rem" }} 
 						/>
 						<Column 
 							field="Department" 
 							header="Assigned Department" 
 							sortable 
 							body={deptTemplate}
-							style={{ minWidth: "14rem" }} 
+							style={{ minWidth: "12rem" }} 
 						/>
 						<Column 
 							field="Input_Date" 
 							header="Raising Date" 
 							sortable 
 							body={raisingDateTemplate}
-							style={{ minWidth: "12rem" }} 
+							style={{ minWidth: "10rem" }} 
 						/>
 						<Column 
 							field="Present_Status" 
 							header="Status" 
 							sortable 
 							body={statusTemplate}
-							style={{ minWidth: "12rem" }} 
+							style={{ minWidth: "10rem" }} 
 						/>
 						<Column 
 							field="Data_Filled_by" 
 							header="Raised By" 
 							sortable 
 							body={raisedByTemplate}
-							style={{ minWidth: "14rem" }} 
+							style={{ minWidth: "12rem" }} 
 						/>
 						<Column 
 							body={actionsTemplate}
-							style={{ width: "4rem" }} 
+							style={{ width: "3rem" }} 
 						/>
 					</DataTable>
 				)}

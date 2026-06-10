@@ -2,7 +2,7 @@ import time
 import jwt
 import requests
 import logging
-from fastapi import Header, HTTPException, Depends, status
+from fastapi import Header, HTTPException, Depends, status, Query
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -12,11 +12,14 @@ logger = logging.getLogger(__name__)
 TOKEN_CACHE = {}
 CACHE_TTL_SECONDS = 300  # Cache SSO token verifications for 5 minutes
 
-def get_current_user(authorization: str = Header(None)) -> dict:
+def get_current_user(authorization: str = Header(None), token: str = Query(None)) -> dict:
     """
     FastAPI dependency that extracts and validates the SSO token.
     Returns the decoded user information dictionary.
     """
+    if not authorization and token:
+        authorization = f"Bearer {token}"
+
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,15 +88,29 @@ def get_current_user(authorization: str = Header(None)) -> dict:
                 detail="SSO session expired"
             )
             
+        # Check if the user is in admin_roles database
+        is_admin = False
+        emp_id = decoded.get("User")
+        name = decoded.get("Person_Name")
+        
+        if (emp_id == "00162" and name == "Sanjay Kumar") or emp_id == "60004":
+            is_admin = True
+        else:
+            try:
+                from app.db import db
+                if db.admin_roles_collection is not None:
+                    role_doc = db.admin_roles_collection.find_one({"emp_id": str(emp_id)})
+                    if role_doc and role_doc.get("role") == "admin":
+                        is_admin = True
+            except Exception as e:
+                logger.error(f"Error checking admin role in db: {e}")
+
         user_data = {
-            "emp_id": decoded.get("User"),
-            "name": decoded.get("Person_Name"),
+            "emp_id": emp_id,
+            "name": name,
             "department": decoded.get("Department"),
             "email": decoded.get("Mail") or decoded.get("Email") or "",
-            "role": "admin" if (
-                (decoded.get("User") == "00162" and decoded.get("Person_Name") == "Sanjay Kumar") or
-                decoded.get("User") == "60004"
-            ) else "user"
+            "role": "admin" if is_admin else "user"
         }
         
         # Cache the result

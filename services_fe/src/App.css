@@ -2170,5 +2170,36 @@ h3 {
   max-width: 320px;
 }
 
+/* Blog-style KB Articles rendering */
+.ql-editor img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 1.5rem auto !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid #e2e8f0 !important;
+  transition: transform 0.2s ease !important;
+}
+
+.ql-editor img:hover {
+  transform: scale(1.01);
+}
+
+.ql-editor p {
+  font-size: 0.95rem !important;
+  line-height: 1.7 !important;
+  color: #334155 !important;
+  margin-bottom: 1rem !important;
+}
+
+.ql-editor h1, .ql-editor h2, .ql-editor h3 {
+  font-family: var(--font-heading) !important;
+  color: #0f172a !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+  font-weight: 700 !important;
+}
+
 
 

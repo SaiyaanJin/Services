@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'log', 'csv', 'json', 'xml', 'md'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
 
 def allowed_file(filename: str) -> bool:
@@ -161,3 +161,44 @@ def download_files(
         if os.path.exists(archive_file):
             os.remove(archive_file)
         raise HTTPException(status_code=500, detail="Error generating download archive")
+
+
+@router.get("/preview")
+def preview_file(
+    filename: str = Query(..., description="Filename to preview"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Serves a single attachment file inline for browser preview.
+    Supports images, PDFs, and text files.
+    """
+    import mimetypes
+    
+    safe_name = secure_filename(filename.replace(" ", "_").replace(")", "").replace("(", "").replace("&", ""))
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Search in all subdirectories of UPLOAD_BASE_PATH
+    abs_base = os.path.abspath(settings.UPLOAD_BASE_PATH)
+    found_path = None
+    
+    for root, dirs, files in os.walk(abs_base):
+        if safe_name in files:
+            candidate = os.path.abspath(os.path.join(root, safe_name))
+            if candidate.startswith(abs_base):
+                found_path = candidate
+                break
+
+    if not found_path or not os.path.exists(found_path):
+        raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
+
+    mime_type, _ = mimetypes.guess_type(found_path)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return FileResponse(
+        path=found_path,
+        media_type=mime_type,
+        headers={"Content-Disposition": f"inline; filename=\"{safe_name}\""}
+    )
+

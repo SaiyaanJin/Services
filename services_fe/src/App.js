@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { BrowserRouter as Router, Route, Link, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ProgressSpinner } from "primereact/progressspinner";
 
@@ -11,19 +11,28 @@ import "./App.css";
 
 // Context & Pages
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { NotificationProvider } from "./context/NotificationContext";
 import DashboardPage from "./pages/DashboardPage";
 import TicketListPage from "./pages/TicketListPage";
 import TicketDetailPage from "./pages/TicketDetailPage";
 import NewTicketPage from "./pages/NewTicketPage";
 import DepartmentPage from "./pages/DepartmentPage";
+import AdminPage from "./pages/AdminPage";
+import CsatPage from "./pages/CsatPage";
+import KnowledgeBasePage from "./pages/KnowledgeBasePage";
+import NotificationBell from "./components/notifications/NotificationBell";
+import CommandPalette from "./components/CommandPalette";
 import { getInitials, getAvatarColorClass } from "./utils/ticketHelpers";
 
 
 // Main layout wrapper to access useAuth hook
 const AppLayout = () => {
 	const { isAuthenticated, authLoading, token, logout, user } = useAuth();
+	const { theme, toggleTheme } = useTheme();
 	const location = useLocation();
 	const navigate = useNavigate();
+	const [sidebarOpen, setSidebarOpen] = useState(false);
 
 	// Search handler synchronized with URL search parameters
 	const searchParams = new URLSearchParams(location.search);
@@ -44,21 +53,6 @@ const AppLayout = () => {
 			navigate(`/Data?${params.toString()}`, { replace: true });
 		}
 	};
-
-	// Ctrl+K keyboard shortcut to focus search input
-	React.useEffect(() => {
-		const handleKeyDown = (e) => {
-			if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-				e.preventDefault();
-				const searchInput = document.querySelector(".search-input");
-				if (searchInput) {
-					searchInput.focus();
-				}
-			}
-		};
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, []);
 
 
 	if (authLoading) {
@@ -100,6 +94,7 @@ const AppLayout = () => {
 									<Link
 										to={"/" + tokenQuery}
 										className={isActive("/") ? "active-link" : ""}
+										onClick={() => setSidebarOpen(false)}
 									>
 										<i className="pi pi-ticket" />
 										<span>Overview</span>
@@ -110,6 +105,7 @@ const AppLayout = () => {
 									<Link
 										to={"/Input" + tokenQuery}
 										className={isActive("/Input") ? "active-link" : ""}
+										onClick={() => setSidebarOpen(false)}
 									>
 										<i className="pi pi-plus" />
 										<span>New Ticket</span>
@@ -120,6 +116,7 @@ const AppLayout = () => {
 									<Link
 										to={"/Data" + tokenQuery}
 										className={isActive("/Data") || location.pathname.startsWith("/ticket") ? "active-link" : ""}
+										onClick={() => setSidebarOpen(false)}
 									>
 										<i className="pi pi-th-large" />
 										<span>Tickets</span>
@@ -130,11 +127,36 @@ const AppLayout = () => {
 									<Link
 										to={"/Department" + tokenQuery}
 										className={isActive("/Department") ? "active-link" : ""}
+										onClick={() => setSidebarOpen(false)}
 									>
 										<i className="pi pi-file" />
 										<span>Reports</span>
 									</Link>
 								</li>
+
+								<li>
+									<Link
+										to={"/kb" + tokenQuery}
+										className={isActive("/kb") ? "active-link" : ""}
+										onClick={() => setSidebarOpen(false)}
+									>
+										<i className="pi pi-book" />
+										<span>Knowledge Base</span>
+									</Link>
+								</li>
+
+								{user?.role === "admin" && (
+									<li>
+										<Link
+											to={"/Admin" + tokenQuery}
+											className={isActive("/Admin") ? "active-link" : ""}
+											onClick={() => setSidebarOpen(false)}
+										>
+											<i className="pi pi-cog" />
+											<span>Admin</span>
+										</Link>
+									</li>
+								)}
 							</ul>
 						</nav>
 						<div className="sidebar-profile-bottom" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
@@ -215,7 +237,27 @@ const AppLayout = () => {
 								/>
 								<span className="search-shortcut">Ctrl+K</span>
 							</div>
-							<div style={{ width: '40px' }} />
+							<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+								{/* Dark mode toggle */}
+								<button
+									onClick={toggleTheme}
+									title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+									style={{
+										width: '40px', height: '40px',
+										borderRadius: '50%',
+										border: 'none',
+										background: 'transparent',
+										cursor: 'pointer',
+										display: 'flex', alignItems: 'center', justifyContent: 'center',
+										color: 'var(--text-color-secondary, #64748b)',
+										transition: 'background 0.2s'
+									}}
+								>
+									<i className={theme === 'dark' ? 'pi pi-sun' : 'pi pi-moon'} style={{ fontSize: '1rem' }} />
+								</button>
+								{/* Notification Bell */}
+								<NotificationBell />
+							</div>
 						</header>
 						{/* Scrollable Page Content Frame */}
 						<main className={`page-content ${location.pathname === "/" ? "dashboard-page-content" : ""} ${location.pathname.startsWith("/Department") ? "department-page-content" : ""} ${location.pathname.startsWith("/ticket") ? "ticket-detail-page-content" : ""}`}>
@@ -225,7 +267,10 @@ const AppLayout = () => {
 								<Route exact path="/ticket/:docketNumber" element={<TicketDetailPage />} />
 								<Route exact path="/Input" element={<NewTicketPage />} />
 								<Route exact path="/Department" element={<DepartmentPage />} />
+								{user?.role === "admin" && <Route exact path="/Admin" element={<AdminPage />} />}
+								<Route exact path="/kb" element={<KnowledgeBasePage />} />
 							</Routes>
+							<CommandPalette />
 						</main>
 					</div>
 				</div>
@@ -237,6 +282,7 @@ const AppLayout = () => {
 						<Route exact path="/ticket/:docketNumber" element={<TicketDetailPage />} />
 						<Route exact path="/Input" element={<NewTicketPage />} />
 						<Route exact path="/Department" element={<DepartmentPage />} />
+						<Route exact path="/kb" element={<KnowledgeBasePage />} />
 					</Routes>
 				</div>
 			)}
@@ -247,9 +293,16 @@ const AppLayout = () => {
 function App() {
 	return (
 		<Router>
-			<AuthProvider>
-				<AppLayout />
-			</AuthProvider>
+			<ThemeProvider>
+				<AuthProvider>
+					<NotificationProvider>
+						<Routes>
+							<Route path="/csat" element={<CsatPage />} />
+							<Route path="/*" element={<AppLayout />} />
+						</Routes>
+					</NotificationProvider>
+				</AuthProvider>
+			</ThemeProvider>
 		</Router>
 	);
 }

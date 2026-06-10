@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Dropdown } from "primereact/dropdown";
 import { Toast } from "primereact/toast";
+import { Dialog } from "primereact/dialog";
+import { jsPDF } from "jspdf";
 import { useAuth } from "../context/AuthContext";
 import { useTickets } from "../hooks/useTickets";
 import { TicketDetailSkeleton } from "../components/common/SkeletonLoader";
@@ -9,6 +11,14 @@ import moment from "moment";
 import apiClient, { API_BASE_URL } from "../api";
 import { getDepartmentBackendName, getCompleteDepartmentName } from "../utils/departmentMap";
 import { getStatusColors } from "../utils/ticketHelpers";
+
+import PriorityBadge from "../components/tickets/PriorityBadge";
+import SlaTimer from "../components/tickets/SlaTimer";
+import AssignmentPanel from "../components/tickets/AssignmentPanel";
+import WatcherPanel from "../components/tickets/WatcherPanel";
+import AuditTrail from "../components/tickets/AuditTrail";
+import TicketTags from "../components/tickets/TicketTags";
+import FilePreviewModal from "../components/tickets/FilePreviewModal";
 
 
 // Dynamic styling & theme logic based on Subject category
@@ -337,11 +347,73 @@ const TicketDetailPage = () => {
 	const [commentText, setCommentText] = useState("");
 	const [isEditingDesc, setIsEditingDesc] = useState(false);
 	const [newDesc, setNewDesc] = useState("");
+
+	const startEditingDesc = () => {
+		setNewDesc(ticket.Breif || ticket.description || "");
+		setIsEditingDesc(true);
+	};
 	
 	// Department status change states
 	const [selectedStatus, setSelectedStatus] = useState(null);
 	const [statusRemarks, setStatusRemarks] = useState("");
 	const [sendingReminder, setSendingReminder] = useState(false);
+	
+	// Transfer states
+	const [transferVisible, setTransferVisible] = useState(false);
+	const [transferDept, setTransferDept] = useState(null);
+	const [transferReason, setTransferReason] = useState("");
+	const [transferring, setTransferring] = useState(false);
+
+	const transferDeptOptions = [
+		{ label: "Human Resource", value: "Human Resource : Human Resource" },
+		{ label: "Contract Services", value: "Contract Services : Contract Services" },
+		{ label: "Finance & Accounts", value: "Finance : Finance & Accounts" },
+		{ label: "Cyber Security", value: "Cyber Security : Cyber Security" },
+		{ label: "System Operation - Post Despatch", value: "System Operation : Post Despatch" },
+		{ label: "System Operation - Real Time", value: "System Operation : Real Time Operation" },
+		{ label: "System Operation - Operational Planning", value: "System Operation : Operational Planning" },
+		{ label: "Market Operation - Open Access", value: "Market Operation : Open Access" },
+		{ label: "Market Operation - Coordination", value: "Market Operation : Market Coordination" },
+		{ label: "Market Operation - Interface Energy", value: "Market Operation : Interface Energy Metering, Accounting & Settlement" },
+		{ label: "Market Operation - Regulatory", value: "Market Operation : Regulatory Affairs, Market Operation planning & Coordination" },
+		{ label: "Logistics - Technical Services", value: "Logistics : TS" },
+		{ label: "Logistics - IT", value: "Logistics : IT" },
+		{ label: "Logistics - Communication", value: "Logistics : Communication" },
+		{ label: "Logistics - OT (SCADA)", value: "Logistics : OT (Decision Support)" }
+	];
+
+	const handleTransfer = async () => {
+		if (!transferDept) return;
+		setTransferring(true);
+		try {
+			const res = await apiClient.post(`/tickets/${ticket.Docket_Number}/transfer`, {
+				department: transferDept,
+				reason: transferReason
+			});
+			if (res.data && res.data.status === "ok") {
+				toast.current?.show({
+					severity: "success",
+					summary: "Ticket Transferred",
+					detail: `Ticket successfully transferred to ${transferDept}`,
+					life: 3000
+				});
+				setTransferVisible(false);
+				setTicket(prev => prev ? { ...prev, Department: transferDept } : null);
+				setTransferReason("");
+				setTransferDept(null);
+				loadTicketDetails();
+			}
+		} catch (err) {
+			toast.current?.show({
+				severity: "error",
+				summary: "Transfer Failed",
+				detail: err.response?.data?.detail || "Could not transfer ticket",
+				life: 3000
+			});
+		} finally {
+			setTransferring(false);
+		}
+	};
 	
 	// Load ticket on mount
 	const loadTicketDetails = useCallback(async () => {
@@ -618,7 +690,7 @@ const TicketDetailPage = () => {
 		const files = getFileList(ticket?.File);
 		if (files.length === 0) return;
 		const filesJoined = files.join("|");
-		const url = `${API_BASE_URL}/download?path=${encodeURIComponent(filesJoined)}&File_Name=Ticket_${ticket.Docket_Number}_Attachments`;
+		const url = `${API_BASE_URL}/download?path=${encodeURIComponent(filesJoined)}&File_Name=Ticket_${ticket.Docket_Number}_Attachments&token=${encodeURIComponent(token)}`;
 		
 		apiClient.get(url, { responseType: "blob" })
 			.then((response) => {
@@ -646,33 +718,113 @@ const TicketDetailPage = () => {
 		});
 	};
 
-	// Export Docket report
+	// Export Docket report using jsPDF
 	const exportDocketReport = () => {
-		const events = getTimelineEvents();
-		const reportContent = `ERLDC SERVICES PORTAL - DOCKET REPORT
-=====================================
-Docket Number: ${ticket.Docket_Number}
-Subject: ${ticket.Subject}
-Raising Date: ${ticket.Input_Date}
-Status: ${ticket.Present_Status}
-Raised By: ${ticket.Data_Filled_by}
-Target Department: ${ticket.Department}
-User Department: ${ticket.User_Department || "—"}
-
-DESCRIPTION
------------
-${ticket.Breif || ticket.description || "No description provided."}
-
-ACTIVITY LOG
-------------
-${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e.Action}`).join("\n")}
-`;
-		const blob = new Blob([reportContent], { type: "text/plain;charset=utf-8" });
-		import("file-saver").then((module) => {
-			if (module && module.default) {
-				module.default.saveAs(blob, `Docket_${ticket.Docket_Number}_Report.txt`);
+		try {
+			const doc = new jsPDF();
+			
+			// Top Banner Background (Indigo gradient fallback)
+			doc.setFillColor(79, 70, 229); // #4f46e5
+			doc.rect(0, 0, 210, 38, "F");
+			
+			// Banner Text
+			doc.setTextColor(255, 255, 255);
+			doc.setFont("helvetica", "bold");
+			doc.setFontSize(22);
+			doc.text("GRID INDIA — ERLDC", 15, 18);
+			doc.setFontSize(10);
+			doc.setFont("helvetica", "normal");
+			doc.text("SERVICES PORTAL — SYSTEM SERVICE REQUEST REPORT", 15, 28);
+			
+			// Main Docket Card details
+			doc.setTextColor(15, 23, 42); // slate-900
+			doc.setFont("helvetica", "bold");
+			doc.setFontSize(14);
+			doc.text(`Docket Number: #${ticket.Docket_Number}`, 15, 50);
+			
+			doc.setFontSize(10);
+			doc.setFont("helvetica", "normal");
+			
+			// Grid India/ERLDC styled properties table
+			const data = [
+				["Subject:", ticket.Subject || ""],
+				["Target Department:", getCompleteDepartmentName(ticket.Department)],
+				["Current Status:", ticket.Present_Status || ""],
+				["Raised By:", ticket.Data_Filled_by || ""],
+				["User Department:", ticket.User_Department || "—"],
+				["Raising Date:", ticket.Input_Date || ""],
+				["SLA Deadline:", ticket.SLA_Deadline ? new Date(ticket.SLA_Deadline).toLocaleString() : "—"]
+			];
+			
+			let yPos = 60;
+			data.forEach(([label, value]) => {
+				doc.setFont("helvetica", "bold");
+				doc.text(label, 15, yPos);
+				doc.setFont("helvetica", "normal");
+				const splitValue = doc.splitTextToSize(String(value), 130);
+				doc.text(splitValue, 60, yPos);
+				yPos += (splitValue.length * 5) + 2;
+			});
+			
+			// Divider line
+			doc.setDrawColor(226, 232, 240);
+			doc.line(15, yPos + 2, 195, yPos + 2);
+			yPos += 12;
+			
+			// Description Box
+			doc.setFont("helvetica", "bold");
+			doc.setFontSize(12);
+			doc.text("Detailed Description", 15, yPos);
+			yPos += 8;
+			
+			doc.setFont("helvetica", "normal");
+			doc.setFontSize(10);
+			const splitDesc = doc.splitTextToSize(ticket.Breif || ticket.description || "No description provided.", 180);
+			doc.text(splitDesc, 15, yPos);
+			
+			yPos += (splitDesc.length * 5) + 12;
+			doc.line(15, yPos - 5, 195, yPos - 5);
+			
+			// Activity timeline logs
+			doc.setFont("helvetica", "bold");
+			doc.setFontSize(12);
+			doc.text("Activity & Audit Logs", 15, yPos);
+			yPos += 10;
+			
+			doc.setFont("helvetica", "normal");
+			doc.setFontSize(9);
+			const events = getTimelineEvents();
+			
+			if (events.length === 0) {
+				doc.text("No timeline actions logged.", 15, yPos);
+			} else {
+				events.forEach((e, idx) => {
+					if (yPos > 275) {
+						doc.addPage();
+						yPos = 20;
+					}
+					const ev = formatEvent(e);
+					const logLine = `[${idx + 1}] ${e.Date} — ${ev.author} (${ev.dept || "System"}): ${e.Action}`;
+					const splitLog = doc.splitTextToSize(logLine, 180);
+					doc.text(splitLog, 15, yPos);
+					yPos += (splitLog.length * 5) + 4;
+				});
 			}
-		});
+			
+			doc.save(`Docket_${ticket.Docket_Number}_Report.pdf`);
+			toast.current?.show({
+				severity: "success",
+				summary: "Export Successful",
+				detail: "Professional PDF report generated and downloaded."
+			});
+		} catch (err) {
+			console.error("PDF generation failed:", err);
+			toast.current?.show({
+				severity: "error",
+				summary: "Export Failed",
+				detail: "Could not generate PDF report."
+			});
+		}
 	};
 
 	// Check if user belongs to the assigned ticket department
@@ -683,15 +835,40 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 		const ssoDeptUpper = user.sso_department.toUpperCase().trim();
 		const ticketDeptLower = ticket.Department.toLowerCase().trim();
 		
-		if (ssoDeptUpper === "IT" && (ticketDeptLower.includes("logistics : it") || ticketDeptLower.includes("cyber security"))) return true;
-		if (ssoDeptUpper === "HR" && ticketDeptLower.includes("human resource")) return true;
-		if (ssoDeptUpper === "F&A" && ticketDeptLower.includes("finance")) return true;
-		if (ssoDeptUpper === "CS" && ticketDeptLower.includes("contract")) return true;
-		if (ssoDeptUpper === "TS" && ticketDeptLower.includes("logistics : ts")) return true;
-		if (ssoDeptUpper === "COMMUNICATION" && ticketDeptLower.includes("communication")) return true;
-		if (ssoDeptUpper === "SCADA" && ticketDeptLower.includes("ot (decision support)")) return true;
-		if (ssoDeptUpper === "MO" && ticketDeptLower.includes("market operation")) return true;
-		if (ssoDeptUpper === "SO" && ticketDeptLower.includes("system operation")) return true;
+		// Map ssoDeptUpper to a normalized short code
+		let shortCode = ssoDeptUpper;
+		if (ssoDeptUpper.includes("INFORMATION TECHNOLOGY") || ssoDeptUpper.includes("IT") || ssoDeptUpper.includes("CYBER")) {
+			shortCode = "IT";
+		} else if (ssoDeptUpper.includes("HUMAN RESOURCE") || ssoDeptUpper.includes("HR")) {
+			shortCode = "HR";
+		} else if (ssoDeptUpper.includes("FINANCE") || ssoDeptUpper.includes("ACCOUNTS") || ssoDeptUpper.includes("F&A")) {
+			shortCode = "F&A";
+		} else if (ssoDeptUpper.includes("CONTRACT") || ssoDeptUpper.includes("CS")) {
+			shortCode = "CS";
+		} else if (ssoDeptUpper.includes("TECHNICAL SERVICES") || ssoDeptUpper.includes("TS")) {
+			shortCode = "TS";
+		} else if (ssoDeptUpper.includes("COMMUNICATION")) {
+			shortCode = "COMMUNICATION";
+		} else if (ssoDeptUpper.includes("SCADA") || ssoDeptUpper.includes("OT")) {
+			shortCode = "SCADA";
+		} else if (ssoDeptUpper.includes("MARKET") || ssoDeptUpper.includes("MO")) {
+			shortCode = "MO";
+		} else if (ssoDeptUpper.includes("SYSTEM") || ssoDeptUpper.includes("SO") || ssoDeptUpper === "MIS" || ssoDeptUpper === "SS" || ssoDeptUpper === "CR" || ssoDeptUpper.includes("CONTROL ROOM")) {
+			shortCode = "SO";
+		}
+
+		if (shortCode === "IT" && (ticketDeptLower.includes("logistics : it") || ticketDeptLower.includes("cyber security") || ticketDeptLower.includes("information technology") || ticketDeptLower.includes("it"))) return true;
+		if (shortCode === "HR" && (ticketDeptLower.includes("human resource") || ticketDeptLower.includes("hr"))) return true;
+		if (shortCode === "F&A" && (ticketDeptLower.includes("finance") || ticketDeptLower.includes("accounts") || ticketDeptLower.includes("f&a"))) return true;
+		if (shortCode === "CS" && (ticketDeptLower.includes("contract") || ticketDeptLower.includes("cs"))) return true;
+		if (shortCode === "TS" && (ticketDeptLower.includes("logistics : ts") || ticketDeptLower.includes("technical services") || ticketDeptLower.includes("ts"))) return true;
+		if (shortCode === "COMMUNICATION" && ticketDeptLower.includes("communication")) return true;
+		if (shortCode === "SCADA" && (ticketDeptLower.includes("scada") || ticketDeptLower.includes("ot (decision support)") || ticketDeptLower.includes("logistics : ot"))) return true;
+		if (shortCode === "MO" && (ticketDeptLower.includes("market operation") || ticketDeptLower.includes("mo"))) return true;
+		if (shortCode === "SO" && (ticketDeptLower.includes("system operation") || ticketDeptLower.includes("so") || ticketDeptLower.includes("mis") || ticketDeptLower.includes("ss") || ticketDeptLower.includes("cr") || ticketDeptLower.includes("control room"))) return true;
+
+		// fallback
+		if (ticketDeptLower.includes(shortCode.toLowerCase()) || ticketDeptLower.includes(ssoDeptUpper.toLowerCase())) return true;
 
 		return false;
 	};
@@ -713,6 +890,9 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 	const closed = isTicketClosed();
 	const departmentStaff = canManageTicket();
 	const creator = isCreator();
+	const isAssignee = Array.isArray(ticket?.Assigned_To)
+		? ticket.Assigned_To.some(u => u?.emp_id === user?.emp_id)
+		: ticket?.Assigned_To?.emp_id === user?.emp_id;
 	const theme = getThemeDetails(ticket.Subject);
 	const statusColors = getStatusColors(ticket.Present_Status);
 
@@ -755,6 +935,8 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 								}} />
 								{ticket.Present_Status}
 							</div>
+							<PriorityBadge priority={ticket.Priority} />
+							<SlaTimer slaDeadline={ticket.SLA_Deadline} presentStatus={ticket.Present_Status} />
 						</div>
 						<div className="text-xs text-500 mt-1 flex align-items-center gap-1">
 							<span>Raised on {ticket.Input_Date}</span>
@@ -763,6 +945,26 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 				</div>
 
 				<div className="flex align-items-center gap-2">
+					{(departmentStaff || user?.role === "admin") && (
+						<button 
+							className="ticket-detail-outline-btn flex align-items-center gap-2"
+							onClick={() => setTransferVisible(true)}
+							style={{ 
+								height: '40px', 
+								border: '1px solid var(--surface-border, #e2e8f0)',
+								borderRadius: '20px',
+								padding: '0 16px',
+								background: 'none',
+								color: '#64748b',
+								cursor: 'pointer',
+								fontWeight: '600',
+								fontSize: '0.82rem'
+							}}
+						>
+							<i className="pi pi-arrow-right-arrow-left" style={{ fontSize: '0.8rem' }} />
+							<span>Transfer</span>
+						</button>
+					)}
 					<button className="ticket-detail-header-btn" style={{ width: '40px', height: '40px', padding: 0 }} onClick={copyShareLink}>
 						<i className="pi pi-ellipsis-h" style={{ fontSize: '0.85rem' }} />
 					</button>
@@ -809,15 +1011,48 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 									}}>
 										<i className={theme.icon} style={{ fontSize: '1.25rem' }} />
 									</div>
-									<div className="flex flex-column">
+									<div className="flex flex-column gap-1">
 										<span className="text-3xs font-bold text-500 uppercase tracking-wider mb-1" style={{ letterSpacing: '0.5px' }}>Subject</span>
 										<h3 className="text-lg font-bold text-900 m-0" style={{ letterSpacing: '-0.3px' }}>{ticket.Subject}</h3>
+										<div className="flex align-items-center gap-4 mt-2 flex-wrap">
+											<TicketTags 
+												tags={ticket.Tags} 
+												docketNumber={ticket.Docket_Number} 
+												canEdit={departmentStaff || user?.role === "admin"}
+												onTagsChange={(newTags) => setTicket(prev => ({ ...prev, Tags: newTags }))}
+											/>
+											<WatcherPanel 
+												docketNumber={ticket.Docket_Number}
+												watchers={ticket.Watchers}
+												currentUser={user}
+												onWatchersChange={(newWatchers) => setTicket(prev => ({ ...prev, Watchers: newWatchers }))}
+											/>
+										</div>
 									</div>
 								</div>
 
 								{/* Description content */}
 								<div className="mt-2 flex flex-column gap-1">
-									<span className="text-3xs font-bold text-500 uppercase tracking-wider mb-1" style={{ letterSpacing: '0.5px' }}>Description</span>
+									<div className="flex align-items-center gap-2 mb-1">
+										<span className="text-3xs font-bold text-500 uppercase tracking-wider" style={{ letterSpacing: '0.5px' }}>Description</span>
+										{(departmentStaff || user?.role === "admin" || isCreator()) && !isEditingDesc && (
+											<button 
+												onClick={startEditingDesc}
+												style={{
+													background: 'none',
+													border: 'none',
+													cursor: 'pointer',
+													padding: '0 4px',
+													color: theme.primaryColor,
+													display: 'inline-flex',
+													alignItems: 'center'
+												}}
+												title="Edit Description"
+											>
+												<i className="pi pi-pencil text-xs" />
+											</button>
+										)}
+									</div>
 									{isEditingDesc ? (
 										<div className="flex flex-column gap-2">
 											<textarea 
@@ -923,27 +1158,29 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 
 						{/* Attachments segment strip */}
 						{attachments.length > 0 && (
-							<div className="flex flex-column sm:flex-row align-items-start sm:align-items-center justify-content-between p-3 border-round-xl border-1 border-50 gap-3 mt-2" style={{ backgroundColor: '#ffffff' }}>
-								<div className="flex align-items-center gap-2 text-sm">
-									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-										<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-									</svg>
-									<span className="font-bold text-800">Attachments ({attachments.length})</span>
-									<span className="text-400">|</span>
-									<span className="text-600 font-medium">{attachments.join(", ")}</span>
+							<div className="flex flex-column p-3 border-round-xl border-1 border-50 gap-3 mt-2" style={{ backgroundColor: '#ffffff' }}>
+								<div className="flex align-items-center justify-content-between">
+									<div className="flex align-items-center gap-2 text-sm">
+										<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+											<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+										</svg>
+										<span className="font-bold text-800">Attachments ({attachments.length})</span>
+									</div>
+									<button 
+										className="ticket-detail-outline-btn flex align-items-center gap-2 text-xs border-1 border-300"
+										onClick={downloadAttachment}
+										style={{ borderColor: theme.primaryColor, color: theme.primaryColor }}
+									>
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+											<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+											<polyline points="7 10 12 15 17 10" />
+											<line x1="12" y1="15" x2="12" y2="3" />
+										</svg>
+										<span>Download Zip</span>
+									</button>
 								</div>
-								<button 
-									className="ticket-detail-outline-btn flex align-items-center gap-2 text-xs border-1 border-300"
-									onClick={downloadAttachment}
-									style={{ borderColor: theme.primaryColor, color: theme.primaryColor }}
-								>
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-										<polyline points="7 10 12 15 17 10" />
-										<line x1="12" y1="15" x2="12" y2="3" />
-									</svg>
-									<span>Download Zip</span>
-								</button>
+								<div className="border-top-1 border-50 my-1" />
+								<FilePreviewModal files={ticket.File} />
 							</div>
 						)}
 					</div>
@@ -952,16 +1189,19 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 				{/* 2. Activity and Audit Logs panel (Full Width) */}
 				<div className="col-12 p-0">
 					<div className="ticket-detail-card flex flex-column gap-3" style={{ marginBottom: 0 }}>
-						<div className="flex align-items-center gap-2 mb-2">
-							<div className="flex align-items-center justify-content-center border-round-lg" style={{ 
-								width: '28px', 
-								height: '28px', 
-								backgroundColor: '#f5f3ff', 
-								color: '#6366f1' 
-							}}>
-								<i className="pi pi-list" style={{ fontSize: '0.85rem' }} />
+						<div className="flex align-items-center justify-content-between mb-2">
+							<div className="flex align-items-center gap-2">
+								<div className="flex align-items-center justify-content-center border-round-lg" style={{ 
+									width: '28px', 
+									height: '28px', 
+									backgroundColor: '#f5f3ff', 
+									color: '#6366f1' 
+								}}>
+									<i className="pi pi-list" style={{ fontSize: '0.85rem' }} />
+								</div>
+								<h3 className="text-md font-bold text-900 m-0">Activity & Audit Logs</h3>
 							</div>
-							<h3 className="text-md font-bold text-900 m-0">Activity & Audit Logs</h3>
+							<AuditTrail docketNumber={ticket.Docket_Number} />
 						</div>
 
 						{/* Custom clean vertical timeline */}
@@ -1108,6 +1348,17 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 											{ticket.Input_Date}
 										</span>
 									</div>
+									<div className="border-top-1 border-50" />
+									<div className="flex justify-content-between align-items-center">
+										<span className="text-sm font-semibold text-500">Assigned To</span>
+										<AssignmentPanel 
+											docketNumber={ticket.Docket_Number}
+											assignedTo={ticket.Assigned_To}
+											ticketDept={ticket.Department}
+											canAssign={departmentStaff || user?.role === "admin"}
+											onAssigned={(newAssignee) => setTicket(prev => ({ ...prev, Assigned_To: newAssignee }))}
+										/>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -1117,7 +1368,7 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 							<div className="flex-1">
 								<div className="flex flex-column gap-4 h-full">
 									{/* Departmental Status Update panel */}
-									{departmentStaff && (
+									{(departmentStaff || isAssignee) && (
 										<div className="ticket-detail-card flex flex-column gap-3 h-full" style={{ marginBottom: 0, border: '1px solid #e0e7ff', backgroundColor: '#fcfdff' }}>
 											<div className="flex align-items-center gap-2 mb-2">
 												<div className="flex align-items-center justify-content-center border-round-lg" style={{ 
@@ -1203,6 +1454,63 @@ ${events.map((e, idx) => `[${idx + 1}] ${e.Date} - ${formatEvent(e).author}: ${e
 					</div>
 				</div>
 			</div>
+
+			{/* Transfer Dialog */}
+			<Dialog 
+				visible={transferVisible} 
+				onHide={() => setTransferVisible(false)} 
+				header="Transfer Ticket Department"
+				style={{ width: '400px' }}
+				footer={
+					<div className="flex justify-content-end gap-2">
+						<button 
+							onClick={() => setTransferVisible(false)} 
+							style={{ 
+								padding: '6px 14px', background: 'none', 
+								border: '1px solid var(--surface-border, #e2e8f0)', borderRadius: '8px', 
+								cursor: 'pointer', fontSize: '0.8rem', color: '#64748b' 
+							}}
+						>
+							Cancel
+						</button>
+						<button 
+							onClick={handleTransfer} 
+							disabled={!transferDept || transferring}
+							style={{ 
+								padding: '6px 14px', background: '#6366f1', 
+								border: 'none', borderRadius: '8px', 
+								cursor: 'pointer', fontSize: '0.8rem', color: '#fff', 
+								fontWeight: '600' 
+							}}
+						>
+							{transferring ? "Transferring..." : "Transfer"}
+						</button>
+					</div>
+				}
+			>
+				<div className="flex flex-column gap-3 py-2">
+					<div className="flex flex-column gap-1">
+						<label className="text-xs font-semibold text-700">Target Department</label>
+						<Dropdown 
+							value={transferDept} 
+							options={transferDeptOptions} 
+							onChange={(e) => setTransferDept(e.value)} 
+							placeholder="Select target department..."
+							className="w-full"
+						/>
+					</div>
+					<div className="flex flex-column gap-1">
+						<label className="text-xs font-semibold text-700">Reason for Transfer</label>
+						<textarea 
+							value={transferReason} 
+							onChange={(e) => setTransferReason(e.target.value)} 
+							rows={3} 
+							placeholder="Explain why this ticket is being transferred..."
+							className="w-full ticket-detail-textarea"
+						/>
+					</div>
+				</div>
+			</Dialog>
 		</div>
 	);
 };

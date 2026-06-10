@@ -3,6 +3,7 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { getDepartmentDisplayName } from "../utils/departmentMap";
 import { useNavigate } from "react-router-dom";
+import apiClient from "../api";
 
 const AuthContext = createContext(null);
 
@@ -84,7 +85,7 @@ export const AuthProvider = ({ children }) => {
 				setTokenState(activeToken);
 				setIsAuthenticated(true);
 
-				setUser({
+				const initialUser = {
 					emp_id: decoded["User"],
 					name: decoded["Person_Name"],
 					sso_department: decoded["Department"],
@@ -94,7 +95,20 @@ export const AuthProvider = ({ children }) => {
 						(decoded["User"] === "00162" && decoded["Person_Name"] === "Sanjay Kumar") ||
 						decoded["User"] === "60004"
 					) ? "admin" : "user",
-				});
+				};
+				setUser(initialUser);
+
+				try {
+					const meRes = await apiClient.get("/auth/me");
+					if (meRes.data && meRes.data.role) {
+						setUser(prev => ({
+							...prev,
+							role: meRes.data.role
+						}));
+					}
+				} catch (meErr) {
+					console.error("Failed to fetch resolved role from backend:", meErr);
+				}
 
 				// Clean the URL: remove ?token= from the address bar while preserving the path.
 				// This ensures React Router sees the correct route (e.g., /ticket/42)

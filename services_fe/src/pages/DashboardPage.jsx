@@ -1,65 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
 import { useAuth } from "../context/AuthContext";
 import apiClient from "../api";
 import { MetricsSkeleton } from "../components/common/SkeletonLoader";
+import { Calendar } from "primereact/calendar";
+import { Button } from "primereact/button";
+import moment from "moment";
 
 const getHistoryIconDetails = (idx) => {
 	const icons = [
 		{ icon: "pi-graduation-cap", color: "#7c3aed", bg: "rgba(124, 58, 237, 0.08)" },
 		{ icon: "pi-code", color: "#2563eb", bg: "rgba(37, 99, 235, 0.08)" },
-		{ icon: "pi-megaphone", color: "#8b5cf6", bg: "rgba(139, 92, 246, 0.08)" }, // Purple megaphone
-		{ icon: "pi-users", color: "#f43f5e", bg: "rgba(244, 63, 94, 0.08)" }, // Red users
-		{ icon: "pi-shield", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.08)" } // Blue shield
+		{ icon: "pi-megaphone", color: "#8b5cf6", bg: "rgba(139, 92, 246, 0.08)" },
+		{ icon: "pi-users", color: "#f43f5e", bg: "rgba(244, 63, 94, 0.08)" },
+		{ icon: "pi-shield", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.08)" }
 	];
 	return icons[idx % icons.length];
-};
-
-const ProgressRing = ({ percentage, strokeColor, label, subLabel, dotColor }) => {
-	const radius = 38;
-	const strokeWidth = 7;
-	const circumference = 2 * Math.PI * radius;
-	const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-	return (
-		<div className="status-ring-wrapper">
-			<div style={{ position: 'relative', width: '110px', height: '110px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-				<svg width="110" height="110" viewBox="0 0 110 110" style={{ transform: 'rotate(-90deg)' }}>
-					{/* Background Circle */}
-					<circle
-						cx="55"
-						cy="55"
-						r={radius}
-						stroke="#f1f5f9"
-						strokeWidth={strokeWidth}
-						fill="none"
-					/>
-					{/* Foreground Progress Circle */}
-					<circle
-						cx="55"
-						cy="55"
-						r={radius}
-						stroke={strokeColor}
-						strokeWidth={strokeWidth}
-						fill="none"
-						strokeDasharray={circumference}
-						strokeDashoffset={strokeDashoffset}
-						strokeLinecap="round"
-						style={{ transition: 'stroke-dashoffset 0.5s ease-in-out' }}
-					/>
-				</svg>
-				<div style={{ position: 'absolute', fontSize: '1.4rem', fontWeight: '850', color: '#0f172a', fontFamily: 'var(--font-heading)' }}>
-					{percentage}%
-				</div>
-			</div>
-			<div className="status-ring-label">{label}</div>
-			<div className="status-ring-sublabel">
-				<span style={{ color: dotColor, fontSize: '0.8rem', lineHeight: '1' }}>●</span>
-				<span>{subLabel}</span>
-			</div>
-		</div>
-	);
 };
 
 const DashboardPage = () => {
@@ -67,34 +24,60 @@ const DashboardPage = () => {
 	const [metrics, setMetrics] = useState([]);
 	const [loadingMetrics, setLoadingMetrics] = useState(true);
 	const [trends, setTrends] = useState({ new_tickets_7d: 0, resolved_tickets_7d: 0, pending_tickets_7d: 0 });
+	const [avgResponseHours, setAvgResponseHours] = useState(null);
+	const [volumeByDay, setVolumeByDay] = useState([]);
+	const [priorityBreakdown, setPriorityBreakdown] = useState({});
+	const [myStats, setMyStats] = useState({ total: 0, resolved: 0, overdue: 0 });
+	const [dateFrom, setDateFrom] = useState(null);
+	const [dateTo, setDateTo] = useState(null);
+
+	const loadDashboardData = useCallback(async () => {
+		setLoadingMetrics(true);
+		try {
+			let url = "/Dashboard";
+			const params = [];
+			if (dateFrom) params.push(`date_from=${moment(dateFrom).format("YYYY-MM-DD")}`);
+			if (dateTo) params.push(`date_to=${moment(dateTo).format("YYYY-MM-DD")}`);
+			if (params.length > 0) {
+				url += `?${params.join("&")}`;
+			}
+			const response = await apiClient.get(url);
+			const data = response.data || {};
+			
+			if (Array.isArray(data)) {
+				setMetrics(data);
+			} else {
+				setMetrics(data.department_stats || []);
+				if (data.trends) setTrends(data.trends);
+				setAvgResponseHours(data.avg_response_hours);
+				setVolumeByDay(data.volume_by_day || []);
+				setPriorityBreakdown(data.priority_breakdown || {});
+				setMyStats(data.my_stats || { total: 0, resolved: 0, overdue: 0 });
+			}
+		} catch (err) {
+			console.error("Error loading dashboard metrics:", err);
+		} finally {
+			setLoadingMetrics(false);
+		}
+	}, [dateFrom, dateTo]);
 
 	useEffect(() => {
-		const loadDashboardData = async () => {
-			try {
-				const response = await apiClient.get("/Dashboard");
-				const data = response.data || {};
-				if (Array.isArray(data)) {
-					setMetrics(data);
-				} else {
-					setMetrics(data.department_stats || []);
-					if (data.trends) {
-						setTrends(data.trends);
-					}
-				}
-			} catch (err) {
-				console.error("Error loading dashboard metrics:", err);
-			} finally {
-				setLoadingMetrics(false);
-			}
-		};
-
 		loadDashboardData();
-	}, []);
+	}, [loadDashboardData]);
 
-	// Calculate totals for KPI Cards
+	// Format response time
+	const formatResponseTime = (hours) => {
+		if (hours === null || hours === undefined) return "2h 34m";
+		const totalMinutes = Math.round(hours * 60);
+		const h = Math.floor(totalMinutes / 60);
+		const m = totalMinutes % 60;
+		if (h > 0) return `${h}h ${m}m`;
+		return `${m}m`;
+	};
+
 	const hasData = metrics.length > 0 && metrics.some(m => m.Total > 0);
 
-	// If no data exists in DB, fall back to exact screenshot values for styling fidelity
+	// Fallback datasets for display if DB is empty
 	const activeMetrics = hasData ? metrics : [
 		{ Department: "Logistics : IT Education Support", Total: 165, Resolved: 135, Pending: 30 },
 		{ Department: "Logistics : IT", Total: 137, Resolved: 120, Pending: 17 },
@@ -112,11 +95,10 @@ const DashboardPage = () => {
 
 	const chartCategories = activeMetrics.slice(0, 7).map(m => {
 		const name = m.Department.split(":")[1] ? m.Department.split(":")[1].trim() : m.Department.trim();
-		if (name === "Cyber Security") return "System Security";
 		return name;
 	});
 
-	// Highcharts Configuration: Ticket Load by Division (Acara style: Bar Comparison)
+	// Column Chart: Ticket load by Division
 	const barChartOptions = {
 		chart: {
 			type: "column",
@@ -162,7 +144,7 @@ const DashboardPage = () => {
 			headerFormat: '<div style="font-weight: 700; color: var(--text-main); margin-bottom: 6px;">{point.key}</div>',
 			pointFormat: '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">' +
 				'<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:{point.color}"></span>' +
-				'<span style="color:var(--text-muted)">{series.name}:</span> ' +
+				'<span style="color:var(--text-muted)">{point.series.name}:</span> ' +
 				'<span style="font-weight:700; color:var(--text-main); margin-left:auto;">{point.y}</span>' +
 				'</div>',
 		},
@@ -194,14 +176,136 @@ const DashboardPage = () => {
 		credits: { enabled: false }
 	};
 
+	// Donut Chart: Priority distribution
+	const hasPriorityData = Object.keys(priorityBreakdown).length > 0;
+	const activePriorityBreakdown = hasPriorityData ? priorityBreakdown : { "Medium": 1 };
+	const priorityChartOptions = {
+		chart: {
+			type: "pie",
+			backgroundColor: "transparent",
+			style: { fontFamily: "var(--font-family)" },
+			height: 250
+		},
+		title: { text: null },
+		tooltip: {
+			pointFormat: '{series.name}: <b>{point.y} ({point.percentage:.1f}%)</b>'
+		},
+		plotOptions: {
+			pie: {
+				innerSize: "60%",
+				borderWidth: 0,
+				dataLabels: { enabled: false },
+				showInLegend: true
+			}
+		},
+		legend: {
+			align: 'center',
+			verticalAlign: 'bottom',
+			itemStyle: {
+				fontFamily: 'var(--font-family)',
+				fontSize: '11px',
+				color: '#64748b',
+				fontWeight: '600'
+			}
+		},
+		series: [
+			{
+				name: "Tickets",
+				colorByPoint: true,
+				data: Object.entries(activePriorityBreakdown).map(([name, count]) => {
+					let color = "#e2e8f0";
+					if (name === "Critical") color = "#ef4444";
+					else if (name === "High") color = "#f97316";
+					else if (name === "Medium") color = "#eab308";
+					else if (name === "Low") color = "#3b82f6";
+					return { name, y: count, color };
+				})
+			}
+		],
+		credits: { enabled: false }
+	};
+
+	// Line Chart: Daily Volume Trends
+	const hasVolumeData = volumeByDay && volumeByDay.length > 0;
+	const activeVolumeByDay = hasVolumeData ? volumeByDay : [
+		{ date: moment().subtract(6, 'days').format("YYYY-MM-DD"), count: 12 },
+		{ date: moment().subtract(5, 'days').format("YYYY-MM-DD"), count: 19 },
+		{ date: moment().subtract(4, 'days').format("YYYY-MM-DD"), count: 15 },
+		{ date: moment().subtract(3, 'days').format("YYYY-MM-DD"), count: 25 },
+		{ date: moment().subtract(2, 'days').format("YYYY-MM-DD"), count: 22 },
+		{ date: moment().subtract(1, 'days').format("YYYY-MM-DD"), count: 30 },
+		{ date: moment().format("YYYY-MM-DD"), count: 28 }
+	];
+	const volumeChartOptions = {
+		chart: {
+			type: "line",
+			backgroundColor: "transparent",
+			style: { fontFamily: "var(--font-family)" },
+			height: 250
+		},
+		title: { text: null },
+		xAxis: {
+			categories: activeVolumeByDay.map(d => moment(d.date).format("DD MMM")),
+			labels: { style: { color: "var(--text-muted)", fontSize: "10px", fontWeight: "600" } }
+		},
+		yAxis: {
+			min: 0,
+			title: { text: "Tickets Created", style: { color: "var(--text-muted)", fontSize: "10px", fontWeight: "600" } },
+			gridLineColor: "#f1f5f9"
+		},
+		tooltip: {
+			shared: true,
+			backgroundColor: '#ffffff',
+			borderWidth: 1,
+			borderColor: '#e2e8f0',
+			borderRadius: 12,
+			shadow: true
+		},
+		series: [{
+			name: "Tickets Created",
+			data: activeVolumeByDay.map(d => d.count),
+			color: "#6366f1"
+		}],
+		credits: { enabled: false }
+	};
+
 	return (
 		<div className="grid col-12 justify-content-center p-0 m-0 gap-0 animate-slide-up">
 
 			{/* Welcome Section */}
-			<div className="dashboard-welcome-row">
+			<div className="dashboard-welcome-row" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'between', alignItems: 'center', width: '100%' }}>
 				<div>
 					<h2 className="dashboard-welcome-title">Welcome back, {user?.name || "Sanjay Kumar"}! 👋</h2>
 					<p className="dashboard-welcome-subtitle">IT Help Desk Analytics Dashboard • Overview of your support operations</p>
+				</div>
+				<div className="flex align-items-center gap-2" style={{ marginLeft: 'auto', marginTop: '10px' }}>
+					<Calendar
+						value={dateFrom}
+						onChange={(e) => setDateFrom(e.value)}
+						placeholder="From Date"
+						dateFormat="dd-mm-yy"
+						showIcon
+						style={{ width: '150px' }}
+					/>
+					<Calendar
+						value={dateTo}
+						onChange={(e) => setDateTo(e.value)}
+						placeholder="To Date"
+						dateFormat="dd-mm-yy"
+						showIcon
+						style={{ width: '150px' }}
+					/>
+					{(dateFrom || dateTo) && (
+						<Button 
+							icon="pi pi-filter-slash" 
+							className="p-button-rounded p-button-text p-button-plain"
+							title="Clear dates"
+							onClick={() => {
+								setDateFrom(null);
+								setDateTo(null);
+							}}
+						/>
+					)}
 				</div>
 			</div>
 
@@ -210,116 +314,152 @@ const DashboardPage = () => {
 				<MetricsSkeleton />
 			) : (
 				<>
-						<div className="kpi-row">
-							{/* Card 1: Total Tickets */}
-							<div className="kpi-card-custom kpi-purple">
-								<div className="kpi-info-left">
-									<span className="kpi-label-text">TOTAL TICKETS</span>
-									<span className="kpi-value-text">{totalTickets}</span>
-									<div className="kpi-trend-text" style={{ color: trends.new_tickets_7d > 0 ? '#10b981' : '#94a3b8' }}>
-										<span>{trends.new_tickets_7d > 0 ? `↗ +${trends.new_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>new in 7 days</span>
-									</div>
-								</div>
-								<div className="kpi-icon-container">
-									<i className="pi pi-ticket" />
+					<div className="kpi-row">
+						{/* Card 1: Total Tickets */}
+						<div className="kpi-card-custom kpi-purple">
+							<div className="kpi-info-left">
+								<span className="kpi-label-text">TOTAL TICKETS</span>
+								<span className="kpi-value-text">{totalTickets}</span>
+								<div className="kpi-trend-text" style={{ color: trends.new_tickets_7d > 0 ? '#10b981' : '#94a3b8' }}>
+									<span>{trends.new_tickets_7d > 0 ? `↗ +${trends.new_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>new in 7 days</span>
 								</div>
 							</div>
-
-							{/* Card 2: Resolved */}
-							<div className="kpi-card-custom kpi-green">
-								<div className="kpi-info-left">
-									<span className="kpi-label-text">RESOLVED</span>
-									<span className="kpi-value-text">{totalResolved}</span>
-									<div className="kpi-trend-text" style={{ color: trends.resolved_tickets_7d > 0 ? '#10b981' : '#94a3b8' }}>
-										<span>{trends.resolved_tickets_7d > 0 ? `↗ +${trends.resolved_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>resolved in 7 days</span>
-									</div>
-								</div>
-								<div className="kpi-icon-container">
-									<i className="pi pi-check-circle" />
-								</div>
-							</div>
-
-							{/* Card 3: Open Tickets */}
-							<div className="kpi-card-custom kpi-orange">
-								<div className="kpi-info-left">
-									<span className="kpi-label-text">OPEN TICKETS</span>
-									<span className="kpi-value-text">{totalPending}</span>
-									<div className="kpi-trend-text" style={{ color: trends.pending_tickets_7d > 0 ? '#ef4444' : '#94a3b8' }}>
-										<span>{trends.pending_tickets_7d > 0 ? `↗ +${trends.pending_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>new in 7 days</span>
-									</div>
-								</div>
-								<div className="kpi-icon-container">
-									<i className="pi pi-clock" />
-								</div>
-							</div>
-
-							{/* Card 4: SLA Compliance */}
-							<div className="kpi-card-custom kpi-blue">
-								<div className="kpi-info-left">
-									<span className="kpi-label-text">SLA COMPLIANCE</span>
-									<span className="kpi-value-text">{resolvedPercentage}%</span>
-									<div className="kpi-trend-text" style={{ color: '#94a3b8' }}>
-										<span>—</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
-									</div>
-								</div>
-								<div className="kpi-icon-container">
-									<i className="pi pi-shield" />
-								</div>
-							</div>
-
-							{/* Card 5: Response Time */}
-							<div className="kpi-card-custom kpi-pink">
-								<div className="kpi-info-left">
-									<span className="kpi-label-text">AVG RESPONSE TIME</span>
-									<span className="kpi-value-text">2h 34m</span>
-									<div className="kpi-trend-text" style={{ color: '#94a3b8' }}>
-										<span>—</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
-									</div>
-								</div>
-								<div className="kpi-icon-container">
-									<i className="pi pi-stopwatch" />
-								</div>
+							<div className="kpi-icon-container">
+								<i className="pi pi-ticket" />
 							</div>
 						</div>
 
-					{/* Row 2: Charts - side by side spanning full width */}
-					<div className="dashboard-charts-row">
-						{/* Left Part: Ticket Comparison Column Chart */}
-						<div className="dashboard-chart-card">
-							<div className="flex justify-content-between align-items-center mb-3">
-								<h3 className="text-md font-bold text-900 m-0" style={{ fontFamily: 'var(--font-heading)' }}>Ticket Comparison</h3>
-								<div className="flex align-items-center gap-2">
-									<div className="chart-type-dropdown">
-										<i className="pi pi-chart-bar" style={{ fontSize: '0.8rem', color: '#64748b' }} />
-										<span>Bar Chart</span>
-										<i className="pi pi-chevron-down" style={{ fontSize: '0.65rem', color: '#64748b' }} />
-									</div>
-									<button className="chart-more-btn">
-										<i className="pi pi-ellipsis-v" />
-									</button>
+						{/* Card 2: Resolved */}
+						<div className="kpi-card-custom kpi-green">
+							<div className="kpi-info-left">
+								<span className="kpi-label-text">RESOLVED</span>
+								<span className="kpi-value-text">{totalResolved}</span>
+								<div className="kpi-trend-text" style={{ color: trends.resolved_tickets_7d > 0 ? '#10b981' : '#94a3b8' }}>
+									<span>{trends.resolved_tickets_7d > 0 ? `↗ +${trends.resolved_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>resolved in 7 days</span>
 								</div>
 							</div>
+							<div className="kpi-icon-container">
+								<i className="pi pi-check-circle" />
+							</div>
+						</div>
+
+						{/* Card 3: Open Tickets */}
+						<div className="kpi-card-custom kpi-orange">
+							<div className="kpi-info-left">
+								<span className="kpi-label-text">OPEN TICKETS</span>
+								<span className="kpi-value-text">{totalPending}</span>
+								<div className="kpi-trend-text" style={{ color: trends.pending_tickets_7d > 0 ? '#ef4444' : '#94a3b8' }}>
+									<span>{trends.pending_tickets_7d > 0 ? `↗ +${trends.pending_tickets_7d}` : '0'}</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>new in 7 days</span>
+								</div>
+							</div>
+							<div className="kpi-icon-container">
+								<i className="pi pi-clock" />
+							</div>
+						</div>
+
+						{/* Card 4: SLA Compliance */}
+						<div className="kpi-card-custom kpi-blue">
+							<div className="kpi-info-left">
+								<span className="kpi-label-text">SLA COMPLIANCE</span>
+								<span className="kpi-value-text">{resolvedPercentage}%</span>
+								<div className="kpi-trend-text" style={{ color: '#94a3b8' }}>
+									<span>—</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
+								</div>
+							</div>
+							<div className="kpi-icon-container">
+								<i className="pi pi-shield" />
+							</div>
+						</div>
+
+						{/* Card 5: Response Time */}
+						<div className="kpi-card-custom kpi-pink">
+							<div className="kpi-info-left">
+								<span className="kpi-label-text">AVG RESPONSE TIME</span>
+								<span className="kpi-value-text">{formatResponseTime(avgResponseHours)}</span>
+								<div className="kpi-trend-text" style={{ color: '#94a3b8' }}>
+									<span>—</span> <span style={{ color: '#94a3b8', fontWeight: '500' }}>vs last 7 days</span>
+								</div>
+							</div>
+							<div className="kpi-icon-container">
+								<i className="pi pi-stopwatch" />
+							</div>
+						</div>
+					</div>
+
+					{/* Personal Request Summary */}
+					<div className="w-full flex align-items-center justify-content-between mb-4 p-4" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)', color: '#ffffff', borderRadius: '16px', boxSizing: 'border-box' }}>
+						<div className="flex align-items-center gap-3">
+							<div className="flex align-items-center justify-content-center border-round-circle bg-indigo-500 text-white" style={{ width: '42px', height: '42px' }}>
+								<i className="pi pi-user text-lg" />
+							</div>
+							<div>
+								<h3 className="text-md font-bold m-0 text-white">Your Personal Request Summary</h3>
+								<p className="text-xs text-indigo-200 m-0">Quick summary of the tickets raised by you</p>
+							</div>
+						</div>
+						<div className="flex align-items-center gap-4 pr-3">
+							<div className="flex flex-column align-items-center">
+								<span className="text-xs font-semibold text-indigo-300 uppercase tracking-wide">Raised</span>
+								<span className="text-xl font-bold">{myStats.total || 0}</span>
+							</div>
+							<div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.15)' }} />
+							<div className="flex flex-column align-items-center">
+								<span className="text-xs font-semibold text-emerald-300 uppercase tracking-wide">Resolved</span>
+								<span className="text-xl font-bold text-emerald-400">{myStats.resolved || 0}</span>
+							</div>
+							<div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.15)' }} />
+							<div className="flex flex-column align-items-center">
+								<span className="text-xs font-semibold text-rose-300 uppercase tracking-wide">Overdue</span>
+								<span className="text-xl font-bold text-rose-400">{myStats.overdue || 0}</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Charts Row 1: Ticket Load & Priority Breakdown */}
+					<div className="dashboard-charts-row">
+						{/* Left Part: Ticket Load column chart */}
+						<div className="dashboard-chart-card">
+							<h3 className="text-md font-bold text-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Ticket Load by Department</h3>
 							<HighchartsReact highcharts={Highcharts} options={barChartOptions} />
 						</div>
 
-						{/* Right Part: Status & Compliance SVG rings */}
-						<div className="dashboard-chart-card flex flex-column gap-2">
-							<h3 className="text-md font-bold text-900 m-0" style={{ fontFamily: 'var(--font-heading)' }}>Status & Compliance</h3>
-							<div className="status-ring-container">
-								<ProgressRing
-									percentage={resolvedPercentage}
-									strokeColor="#10b981"
-									label="SLA Compliance"
-									subLabel="On Target"
-									dotColor="#10b981"
-								/>
-								<ProgressRing
-									percentage={100 - resolvedPercentage}
-									strokeColor="#f43f5e"
-									label="At Risk"
-									subLabel="Needs Attention"
-									dotColor="#f43f5e"
-								/>
+						{/* Right Part: Priority breakdown donut chart */}
+						<div className="dashboard-chart-card">
+							<h3 className="text-md font-bold text-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Priority Distribution</h3>
+							<HighchartsReact highcharts={Highcharts} options={priorityChartOptions} />
+						</div>
+					</div>
+
+					{/* Charts Row 2: Volume Trends & Leaderboard */}
+					<div className="dashboard-charts-row">
+						{/* Left Part: Volume Trend line chart */}
+						<div className="dashboard-chart-card">
+							<h3 className="text-md font-bold text-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Daily Ticket Volume Trend</h3>
+							<HighchartsReact highcharts={Highcharts} options={volumeChartOptions} />
+						</div>
+
+						{/* Right Part: Department Leaderboard */}
+						<div className="dashboard-chart-card" style={{ maxHeight: '315px', overflowY: 'auto' }}>
+							<h3 className="text-md font-bold text-900 mb-3" style={{ fontFamily: 'var(--font-heading)' }}>Department Leaderboard</h3>
+							<div className="flex flex-column gap-3">
+								{activeMetrics.map((m, idx) => {
+									const name = m.Department.split(":")[1] ? m.Department.split(":")[1].trim() : m.Department.trim();
+									const resolutionRate = m.Total > 0 ? Math.round((m.Resolved / m.Total) * 100) : 0;
+									return (
+										<div key={idx} className="flex align-items-center justify-content-between border-bottom-1 border-slate-100 pb-2">
+											<div className="flex flex-column gap-1" style={{ maxWidth: '60%' }}>
+												<span className="font-semibold text-sm text-800" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+												<span className="text-xs text-500">{m.Total} total • {m.Resolved} resolved</span>
+											</div>
+											<div className="flex align-items-center gap-3">
+												<span className="font-bold text-sm text-indigo-600">{resolutionRate}%</span>
+												<div style={{ width: '80px', height: '6px', backgroundColor: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
+													<div style={{ width: `${resolutionRate}%`, height: '100%', backgroundColor: '#10b981', borderRadius: '3px' }} />
+												</div>
+											</div>
+										</div>
+									);
+								})}
 							</div>
 						</div>
 					</div>
@@ -327,13 +467,10 @@ const DashboardPage = () => {
 					{/* Row 3: Tickets History Grid */}
 					<div className="dashboard-history-section">
 						<div className="flex justify-content-between align-items-center mb-3">
-							<h3 className="text-md font-bold text-900 m-0" style={{ fontFamily: 'var(--font-heading)' }}>Tickets History</h3>
-							<button className="chart-more-btn">
-								<i className="pi pi-ellipsis-h" />
-							</button>
+							<h3 className="text-md font-bold text-900 m-0" style={{ fontFamily: 'var(--font-heading)' }}>Queue History Summary</h3>
 						</div>
 						<div className="history-grid">
-							{activeMetrics.slice(0, 5).map((m, idx) => {
+							{activeMetrics.slice(0, 3).map((m, idx) => {
 								const division = m.Department.split(":")[1] ? m.Department.split(":")[1].trim() : m.Department.trim();
 								const total = m.Total || 0;
 								const resolved = m.Resolved || 0;
@@ -347,7 +484,7 @@ const DashboardPage = () => {
 										</div>
 										<div className="flex-grow-1 flex flex-column gap-2" style={{ overflow: 'hidden' }}>
 											<div className="flex justify-content-between align-items-start">
-												<span className="profile-name" title={division} style={{ color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOutline: 'none', textOverflow: 'ellipsis', maxWidth: '120px' }}>
+												<span className="profile-name" title={division} style={{ color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
 													{division}
 												</span>
 												<div className="flex flex-column align-items-end" style={{ gap: '2px' }}>
