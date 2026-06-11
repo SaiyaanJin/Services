@@ -198,6 +198,8 @@ def set_admin_role(request: Request, current_user: dict = Depends(require_admin)
 
     if not emp_id:
         raise HTTPException(status_code=400, detail="emp_id is required")
+    if emp_id == "00162":
+        raise HTTPException(status_code=400, detail="Super Admin role cannot be modified")
     if role not in ("admin", "user"):
         raise HTTPException(status_code=400, detail="role must be 'admin' or 'user'")
 

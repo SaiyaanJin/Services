@@ -133,6 +133,14 @@ const AdminPage = () => {
 
 	// User Promotion/Demotion
 	const toggleUserRole = async (rowData) => {
+		if (rowData.emp_id === "00162") {
+			toast.current?.show({
+				severity: "warn",
+				summary: "Action Prohibited",
+				detail: "Super Admin cannot be demoted"
+			});
+			return;
+		}
 		const newRole = rowData.role === "admin" ? "user" : "admin";
 		try {
 			await apiClient.post("/admin/roles", {
@@ -431,21 +439,29 @@ const AdminPage = () => {
 									field="role" 
 									header="Role" 
 									body={(row) => (
-										<span className={`px-3 py-1 border-round-pill text-xs font-semibold ${row.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}>
-											{row.role}
+										<span 
+											className={`px-3 py-1 border-round-pill text-xs font-bold ${row.emp_id === '00162' ? 'bg-red-500 text-white' : row.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'}`}
+											style={{ whiteSpace: "nowrap" }}
+										>
+											{row.emp_id === '00162' ? '👑 Super Admin' : row.role}
 										</span>
 									)} 
-									style={{ width: "8rem" }}
+									style={{ width: "10rem" }}
 								/>
 								<Column 
-									body={(row) => (
-										<Button 
-											label={row.role === "admin" ? "Demote" : "Promote Admin"} 
-											icon="pi pi-user-edit" 
-											className={`p-button-sm ${row.role === "admin" ? "p-button-secondary p-button-outlined" : "p-button-indigo"}`}
-											onClick={() => toggleUserRole(row)} 
-										/>
-									)} 
+									body={(row) => {
+										if (row.emp_id === '00162') {
+											return null;
+										}
+										return (
+											<Button 
+												label={row.role === "admin" ? "Demote" : "Promote Admin"} 
+												icon="pi pi-user-edit" 
+												className={`p-button-sm ${row.role === "admin" ? "p-button-secondary p-button-outlined" : "p-button-indigo"}`}
+												onClick={() => toggleUserRole(row)} 
+											/>
+										);
+									}} 
 									style={{ width: "12rem", textAlign: "center" }}
 								/>
 							</DataTable>
